@@ -1,24 +1,9 @@
-# Source code (not started)
-
-> This directory intentionally contains only this README in Milestone 0. No application code or agent exists.
->
-> No production code is written until:
->
-> - Milestone 0 is complete (see `docs/12_backlog_and_milestones.md`),
-> - Fizz has returned `APPROVE` for the exact M0 PR head (`APPROVE WITH CONDITIONS` pauses merge and `BLOCK` stops the milestone),
-> - Osman has approved the start of Milestone 1,
-> - blocking architecture, workflow, persistence, identity, and tool-contract decisions are accepted.
->
-> The following M1 layout is illustrative and remains subject to those decisions:
->
-> ```text
-> src/
-> ├── intake/            # request validation, freshness, identity, tenancy
-> ├── workflow/          # durable state machine, run_id, audit events
-> ├── tools/             # T1..T7 with schema-validated contracts
-> ├── agent/             # LLM adapter, prompt registry, bounded reasoning
-> ├── review/            # human approve/edit/reject/escalate UI + API
-> ├── executor/          # post-approval write executor
-> ├── audit/             # append-only log writers
-> └── observability/     # logging, tracing, metrics, cost telemetry
-> ```
+# Source code
++
++This directory contains the bounded Issue #14 M1-I1 implementation candidate.
++The authoritative scope is `docs/12_backlog_and_milestones.md` and ADR-0002–0005.
++
++Only the local simulated T1–T3 investigation and human review path is implemented.
++There is no AWS deployment, external write, workflow engine, production identity, or
++live-model validation.
++

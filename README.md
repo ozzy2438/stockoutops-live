@@ -2,11 +2,61 @@
 
 **Human-Supervised AI Decisioning & Reliability Platform**
 
-> **Current implementation status: planning-only scaffold.** No application code, agent, database, AWS resource, or production service exists. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
+> **Current implementation status: M1 local simulated human-supervised vertical slice — implementation candidate pending evidence and assurance.** This is not production-ready, production-proven, deployed to AWS, or evidence of model or business quality. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
 
 StockoutOps Live is the new canonical Phase-2 implementation. The [PharmaRetail AI Control Tower](https://github.com/ozzy2438/PharmaRetail-AI-Control-Tower) is reference material only; useful patterns may be selectively migrated after review, but the old project is not a runtime dependency or a codebase to copy wholesale.
 
 AWS is the target cloud. The preferred simple stack is Python, PostgreSQL/Amazon RDS, S3 where needed, dbt-core where justified, FastAPI, a lightweight human-review UI, Docker, ECS Fargate, CloudWatch, Secrets Manager, and GitHub Actions. Architecture v2, workflow engine, persistence design, and tool contracts are Milestone-0 proposals. Accepting the planning scaffold does not select unresolved technical options; accepted ADRs govern implementation.
+
+## M1 local execution
+
+The accepted M1 subset is intentionally smaller than the future architecture: one
+simulated stockout case, PostgreSQL 16, T1–T3 evidence, one deterministic reasoning
+step, and a human review decision. It performs no external write.
+
+```bash
+make setup
+make up
+make test
+make smoke-stub
+make down
+```
+
+`make up` builds the image, starts PostgreSQL 16, applies ordered plain-SQL
+migrations, verifies/seeds the SHA-256 fixture manifest, and starts FastAPI. The review
+page is at `http://127.0.0.1:8000/review`. Generated local bearer tokens live only
+under ignored `.local/`; do not put them in URLs, logs, screenshots, source files, or
+browser storage.
+
+For a host-Python path, export the values in `.env.example`, then run
+`make migrate`, `make seed`, and `make serve`. Migrations are repeatable and use
+the migration role; the application uses the restricted `stockoutops_app` role.
+
+### M1 architecture-to-code map
+
+| Responsibility | Implementation |
+|---|---|
+| FastAPI and same-origin Jinja review page | `src/stockoutops/api.py`, `templates/review.html` |
+| Deterministic state/control spine | `state_machine.py`, `service.py` |
+| Server-derived local identity | `identity.py` |
+| PostgreSQL transactions and tenant boundary | `database.py`, `repository.py`, `migrations/` |
+| T1–T3 contracts, provenance, freshness and fixtures | `evidence/`, `fixtures/v1/` |
+| Stub and provider-neutral OpenAI boundary | `reasoning/` |
+
+Security boundaries are fail-closed: client-supplied identity/tenant/role is rejected,
+cross-tenant reads return 404, evidence must pass schema/freshness/provenance checks
+before reasoning, citations are bound after reasoning, review is bound to reviewer,
+tenant, draft hash and PT24H expiry, and audit mutation is denied by permissions and a
+database trigger. This local application does not implement production IdP, sessions,
+MFA, RLS, backup/PITR, distributed execution, or external writes.
+
+Recovery is restart plus retry with the original idempotency key. The same request
+returns the durable `run_id`; completed or failed reasoning is not automatically
+called again. Rollback is to stop the local app and retain PostgreSQL evidence/audit
+for inspection; migrations are forward-only and non-destructive.
+
+No live OpenAI call was made during M1-I1 implementation. The OpenAI adapter is tested
+with an injected mock only; local and CI execution use `DeterministicStubAdapter`.
 
 ---
 
@@ -92,7 +142,7 @@ The project is done **only** when all of the following are true:
 
 ### Honest labelling
 
-- Current state: **Milestone-0 planning scaffold — no application or live deployment.**
+- Current state: **M1 local simulated human-supervised vertical slice — implementation candidate pending evidence and assurance.**
 - Only after controlled UAT and failure-injection evidence: **Production-grade Stockout Investigation Platform validated through controlled UAT and failure-injection testing.**
 - If real retail operators later use it under a bounded process: **Human-supervised production pilot.**
 - **Never** use the phrase *production-proven* without real users and sustained operation.
@@ -142,8 +192,10 @@ Only `APPROVE` opens a milestone gate. `APPROVE WITH CONDITIONS` pauses merge an
 │   └── uat/                    # G2 operator study
 ├── observability/              # Dashboards, alert rules, SLO defs
 ├── infra/                      # IaC, deployment, secrets scaffolding
-├── src/                        # Documentation-only until Milestone 0 is approved
-├── tests/                      # Documentation-only until Milestone 0 is approved
+├── src/stockoutops/            # Bounded M1 application
+├── migrations/                 # Ordered, forward-only PostgreSQL SQL
+├── fixtures/v1/                # Hash-manifested simulated T1–T3 fixtures
+├── tests/                      # Unit and real-PostgreSQL integration tests
 ├── milestones/                 # Per-milestone deliverable folders
 └── .github/                    # Templates, workflows, CODEOWNERS
 ```
@@ -157,10 +209,12 @@ Only `APPROVE` opens a milestone gate. `APPROVE WITH CONDITIONS` pauses merge an
 5. Merges are squash-only; releases are tagged `vMAJOR.MINOR.PATCH`.
 6. `main` is protected: required reviews, required status checks, no force-push, no direct commits.
 
-## 10. Milestone 0 — Planning Only
+## 10. Milestone 0 — Completed planning baseline
 
-**No production code is written in Milestone 0.** Deliverables live under `docs/` and `milestones/M0-planning/`. See `docs/12_backlog_and_milestones.md` for the ordered issue list.
+Milestone 0 remains the documentation baseline under `docs/` and
+`milestones/M0-planning/`. The authoritative small M1 scope and its remaining gates
+are in `docs/12_backlog_and_milestones.md`.
 
 ---
 
-*Last updated: 2026-08-10 Milestone-0 handoff consistency pass. Owner: Osman Orka. Independent assurance: Fizz.*
+*Last updated: 2026-08-11 M1-I1 local implementation candidate. Owner: Osman Orka. Independent M1 evidence and assurance remain pending.*
