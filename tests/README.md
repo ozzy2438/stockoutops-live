@@ -1,6 +1,6 @@
-# Tests
+# Tests (not started)
 
-> Empty in Milestone 0. Layout target for M1+:
+> No test code exists in Milestone 0. Proposed layout for M1+:
 >
 > ```
 > tests/

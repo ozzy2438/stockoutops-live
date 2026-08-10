@@ -15,7 +15,7 @@
 
 ## Runbook template
 
-```
+```markdown
 # <Runbook title>
 
 ## Applies to

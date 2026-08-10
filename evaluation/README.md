@@ -4,7 +4,7 @@ All evaluation artifacts live here.
 
 ## Layout
 
-```
+```text
 evaluation/
 ├── golden_cases/     # curated cases with expected outcomes (G0 + regression)
 ├── replay/           # G0 historical-replay harness

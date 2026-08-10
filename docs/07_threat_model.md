@@ -1,15 +1,15 @@
 # 07 — Security, Privacy & Threat Model
 
-> Owner: Honey. Reviewer: Fizz. Method: STRIDE per trust boundary, plus AI-specific threat classes.
+> Owner: Honey. Reviewer: Fizz. Status: **proposal; not implemented or accepted**. Method: STRIDE per trust boundary, plus AI-specific threat classes.
 
 ## Trust boundaries
 
 1. **User ↔ App UI.** Auth via SSO/IdP; session tokens; CSRF protections.
-2. **App ↔ Workflow engine.** Signed internal calls; tenant + user propagated.
-3. **Workflow engine ↔ Tool layer.** Tool invocations schema-validated; capability tokens attached.
-4. **Tool layer ↔ Data marts.** Snowflake role assumed via short-lived credentials; RLS enforced.
-5. **Workflow engine ↔ LLM provider.** Egress only via allow-listed endpoints; no PII surfaced unless whitelisted; prompts + responses logged (hash + retention policy).
-6. **Write executor ↔ External systems (Jira, notifier).** Post-approval only; per-tenant service accounts; scoped tokens.
+2. **FastAPI boundary ↔ Control spine.** Logical boundary; same-process versus network topology is open. Tenant and actor context must be server-derived and preserved.
+3. **Control spine ↔ Tool layer.** Tool invocations schema-validated; scoped execution context attached.
+4. **Tool layer ↔ PostgreSQL/S3 evidence.** Server-derived tenant/actor scope; PostgreSQL RLS and application checks proposed; S3 access limited to authorised objects.
+5. **Control spine ↔ LLM provider.** Egress only via allow-listed endpoints; no sensitive data surfaced unless whitelisted; hashes and approved metadata logged under the accepted retention policy.
+6. **Write executor ↔ Approved task/notification systems.** Post-approval only; per-tenant credentials; scoped tokens.
 
 ## Assets
 
@@ -17,16 +17,16 @@
 - Audit log (integrity is critical; append-only).
 - Prompt / tool / model registry.
 - Human approval tokens.
-- Secrets (LLM keys, Snowflake creds, notifier tokens).
+- Secrets (LLM keys, PostgreSQL credentials, AWS integration secrets, task/notifier tokens).
 
 ## STRIDE summary (per boundary)
 
 | Boundary | Spoofing | Tampering | Repudiation | Information Disclosure | DoS | Elevation |
 |----------|----------|-----------|-------------|-------------------------|-----|-----------|
 | User ↔ UI | SSO + MFA | TLS, signed cookies | Audit log w/ actor id | Session scope, RLS on view | Rate limit | RBAC checks |
-| UI ↔ Workflow | mTLS/JWT | Request signing | Full trace w/ run_id | Field-level filtering | Queue limits | Server-side authz |
+| API ↔ Control spine | Server-derived identity; authenticate internal calls if networked | Typed commands, transition validation | Full trace with run_id | Field-level filtering | Concurrency limits | Never trust client-supplied role/tenant |
 | Workflow ↔ Tool | Capability token | Schema validation | Event log per call | Row cap, freshness gate | Per-call budgets | No tool escalation |
-| Tool ↔ Snowflake | Short-lived creds | Read-only role, no DDL | Snowflake query history | RLS + column masking | Warehouse sizing | No role assumption |
+| Tool ↔ PostgreSQL/S3 | Managed credentials | Read-only tool transactions; immutable object hashes | Workflow event + database/CloudWatch audit | Tenant scope, PostgreSQL RLS, S3 prefix/object policy | Statement/connection/response limits | No caller-scope escalation |
 | Workflow ↔ LLM | API key rotation | Request hash | Prompt/response logged | Redaction pre-egress | Token/latency caps | No tool exec from LLM |
 | Write ↔ External | Per-tenant token | Idempotency keys | Write event log | Least-privilege scopes | Backoff | No write w/o approval |
 
@@ -45,16 +45,16 @@
 
 ## Privacy
 
-- PII inventory maintained under `docs/artifacts/pii-inventory.md` (created in M0).
-- No PII is surfaced to the LLM unless whitelisted in the data contract for that mart.
-- Retention: audit log ≥ 12 months; LLM prompt/response bodies retained per data classification policy (default: 30 days, redacted).
+- A PII/data-classification inventory must be accepted before any M1 data connection; its location is set during the source-data decision.
+- No PII is surfaced to the LLM unless whitelisted in the accepted source/tool contract.
+- Retention is open under OD-10. Until accepted, raw LLM prompt/response persistence is disabled by default; hashes and approved metadata may be retained.
 - Data-subject requests: supported via `run_id` + tenant lookups.
 
 ## Secrets
 
-- Managed in the platform secret store (never in git).
-- Rotation cadence: LLM keys 90 days; Snowflake creds via key-pair rotated 90 days; notifier tokens per policy.
-- CI uses OIDC to the cloud provider where supported.
+- Runtime secrets are proposed for AWS Secrets Manager and are never committed.
+- Rotation cadence and database authentication are set by the reviewed security design; static long-lived AWS keys are forbidden.
+- GitHub Actions should use short-lived AWS/OIDC authentication if approved.
 
 ## Failure-closed defaults
 

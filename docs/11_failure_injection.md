@@ -47,7 +47,7 @@
 - FI-7 Cost blowout (LLM token budget breach).
 - FI-8 Workflow-engine crash mid-run (recovery + idempotency).
 - FI-9 Notifier outage (task created but notification fails; correct compensating action).
-- FI-10 Warehouse throttling (retry / backoff behaviour).
+- FI-10 RDS connection exhaustion or query timeout (fail-closed, retry, and backoff behaviour).
 
 ## Reporting template
 

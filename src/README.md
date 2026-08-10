@@ -1,14 +1,14 @@
-# Source code
+# Source code (not started)
 
-> This directory is intentionally **empty** in Milestone 0.
+> This directory intentionally contains only this README in Milestone 0. No application code or agent exists.
 >
 > No production code is written until:
 > - Milestone 0 is complete (see `docs/12_backlog_and_milestones.md`),
 > - Fizz has returned an APPROVE (or APPROVE WITH CONDITIONS) verdict,
 > - Osman has approved the start of Milestone 1,
-> - ADR-0002 (LLM provider) and the workflow-engine ADR are accepted.
+> - blocking architecture, workflow, persistence, identity, and tool-contract decisions are accepted.
 >
-> The intended M1 layout is:
+> The following M1 layout is illustrative and remains subject to those decisions:
 >
 > ```
 > src/

@@ -6,6 +6,8 @@
 
 > **No production code.** Deliverables are documents and plans.
 
+Document presence or drafting does not check an item off. An item closes only through its issue/PR evidence and required independent review.
+
 - [ ] M0-01 — Current-state audit filled in (`docs/01_current_state_audit.md`) — owner: Orchestrator.
 - [ ] M0-02 — Gap-to-deliverable matrix populated (`docs/02_gap_matrix.md`) — owner: Orchestrator + Scout.
 - [ ] M0-03 — Scope definition confirmed with Osman (`docs/03_scope.md`) — owner: Orchestrator.
@@ -28,7 +30,7 @@
 
 - [ ] M1-01 — Skeleton repo layout for `src/` finalised (framework choice ADR merged).
 - [ ] M1-02 — Deterministic outer loop (intake, guardrails, workflow engine, audit).
-- [ ] M1-03 — Tool layer T1–T6 implemented under contracts; T7 as draft-only.
+- [ ] M1-03 — Tool layer T1–T6 implemented under the accepted v2 contracts; T7 remains draft-only.
 - [ ] M1-04 — Prompt / tool / model registry.
 - [ ] M1-05 — Golden-case suite (≥ 34 cases) + replay harness.
 - [ ] M1-06 — CI wires golden-case suite (block on regression).

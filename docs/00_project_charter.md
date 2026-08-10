@@ -6,7 +6,9 @@
 
 ## Purpose
 
-Convert the existing **PharmaRetail AI Control Tower** (governed Snowflake/dbt stockout-investigation system) into an **operated, observable, human-supervised product** with credible evidence of user acceptance, incidents, reliability and cost.
+Create a new canonical Phase-2 implementation of a stockout investigation workflow as an **operated, observable, human-supervised product** with credible evidence of user acceptance, incidents, reliability, and cost.
+
+The PharmaRetail AI Control Tower is reference material only. Its closed Snowflake environment is not a dependency, and its code is not migrated wholesale. Select patterns may be brought across later after a scoped review.
 
 The deliverable is **not** another portfolio dashboard. The deliverable is the end-to-end chain:
 
@@ -14,18 +16,19 @@ The deliverable is **not** another portfolio dashboard. The deliverable is the e
 
 ## Why now
 
-The portfolio already contains 47 projects covering analytics, data engineering, ML, AI automation and BI. What is missing is **operational maturity**: shadow/assisted pilot, baseline comparison, acceptance/edit rate, time-to-decision, cost per investigation, and evidence of sustained operation.
+Phase 1 demonstrates useful data, governance, citation, and deterministic-control patterns. What is still missing is **operational maturity**: a durable approve-to-act workflow, authenticated tenant isolation, an AWS deployment, shadow/assisted operation, baseline comparison, acceptance/edit evidence, time-to-decision, cost per investigation, and sustained-operation evidence.
 
 ## Business job
 
 When a stockout alert or investigation request is received, the platform:
 
 1. Validates identity, tenant, eligibility and data freshness.
-2. Retrieves inventory, sales, supplier, promotion and approved SOP evidence.
-3. Identifies the likely root cause and affected scope.
-4. Prepares a cited recovery recommendation.
-5. Requires human approval before any write action.
-6. Records the final outcome in a fully auditable workflow.
+2. Assigns and persists a durable `run_id`.
+3. Retrieves authorised inventory, sales, supplier, promotion and approved SOP evidence.
+4. Identifies the likely root cause and affected scope.
+5. Prepares a cited recovery recommendation.
+6. Requires human approval before any write action.
+7. Records the final outcome in a fully auditable workflow.
 
 ## Initial autonomy
 
@@ -33,13 +36,15 @@ When a stockout alert or investigation request is received, the platform:
 
 ## Non-goals for Phase 2
 
-- No new warehouse, no new dashboard, no new tahmin model, no generic AI copilot.
+- No wholesale Phase-1 port and no Snowflake compatibility layer.
+- No second analytics warehouse, new forecasting model, or generic AI copilot.
+- No Kafka, Kubernetes, Databricks, Airflow, MLflow, or other major platform without a later ADR demonstrating a concrete need.
 - No commercial production-A/B claim. UAT is honestly labelled as *controlled UAT experiment*.
 - No purchase-order, transfer, pricing, promotion, supplier-commitment automation.
 
 ## Success (top-line)
 
-The project succeeds when **all** DoD bullets in `README.md` §6 are true, Fizz has returned a final verdict, and the honest state label matches reality (`Production-grade ... controlled UAT` at minimum; `Human-supervised production pilot` if real operators use it).
+The project succeeds when **all** DoD bullets in `README.md` section 6 are true, Fizz has returned a final verdict, and the honest state label matches reality. During Milestone 0 the only valid label is “planning scaffold — no application or live deployment”.
 
 ## Stakeholders
 
@@ -66,3 +71,4 @@ Dates are set at the end of M0.
 - No new external dependency without an ADR.
 - Passing tests ≠ milestone completion.
 - Zero RLS leakage is a release-blocker.
+- No application implementation starts before the M0 verdict and Osman’s approval.

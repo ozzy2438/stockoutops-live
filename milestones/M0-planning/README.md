@@ -2,6 +2,8 @@
 
 > No production code in this milestone. Deliverables are documents, plans, and the ADR framework.
 
+Current handoff state: the audit and gap matrix are populated, and the AWS architecture/tool documents are review-ready proposals. Checkboxes remain open until the matching issue/PR evidence, independent review, and verdict are recorded.
+
 ## Deliverables
 
 See the full checklist in `docs/12_backlog_and_milestones.md` under “Milestone 0”.
@@ -38,4 +40,4 @@ See the full checklist in `docs/12_backlog_and_milestones.md` under “Milestone
 - [ ] `docs/11_failure_injection.md` accepted; ≥ 6 scenarios.
 - [ ] ADR-0001 accepted; ADR-0002 (LLM provider) accepted.
 - [ ] `docs/13_risks_and_open_decisions.md` current.
-- [ ] `docs/artifacts/pii-inventory.md` created.
+- [ ] PII/data-classification inventory location and content accepted before M1 data access.

@@ -10,7 +10,7 @@
 - **Fizz verdict.** APPROVE / APPROVE WITH CONDITIONS / BLOCK issued at every milestone gate by independent assurance.
 - **Golden case.** A curated case with expected root cause, evidence, tool set, and escalation flag used for regression.
 - **Historical replay (G0).** Blind rerun of past resolved cases in staging.
-- **RLS.** Row-level security enforced at the data warehouse.
+- **RLS.** Row-level security proposed at the PostgreSQL data boundary and backed by application-level tenant checks.
 - **Run ID.** Durable identifier for a single investigation across intake, tool calls, LLM calls, approval and audit.
 - **Shadow mode (G1).** Agent analyses live cases without executing any external action; diffed against analyst decisions.
 - **SLO.** Service-level objective; a target on an SLI over a window.

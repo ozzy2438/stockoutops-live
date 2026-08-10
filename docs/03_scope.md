@@ -3,7 +3,7 @@
 ## In scope (Phase 2)
 
 1. **Stockout / low-stock investigation workflow** as described in `docs/00_project_charter.md`.
-2. Reading governed inventory, sales, supplier, promotion and SOP marts.
+2. Reading reviewed, tenant-authorised inventory, sales, supplier, promotion and SOP sources through governed contracts.
 3. Deterministic quality, freshness, permissioning, tenancy and policy checks.
 4. AI-driven root-cause hypothesis and affected-scope estimation.
 5. Cited recovery recommendation preparation.
@@ -19,6 +19,7 @@
 
 ## Out of scope (Phase 2)
 
+- Wholesale migration of the PharmaRetail repository or preservation of its Snowflake runtime.
 - Purchase-order creation, modification, cancellation.
 - Inventory transfer initiation.
 - Pricing or promotion changes.
@@ -28,6 +29,7 @@
 - Any direct unrestricted DB writes bypassing the tool layer.
 - New forecasting / demand-planning models.
 - Building a generic “AI copilot” that answers arbitrary questions.
+- Kafka, Kubernetes, Databricks, Airflow, Snowflake, MLflow, or another major platform unless a later ADR proves a requirement.
 - Full commercial production-A/B test with statistical claims of ROI.
 - Multi-region HA, disaster-recovery guarantees beyond SLO targets.
 - Non-stockout workflows (returns, receiving, shrinkage) — candidate for Phase 3.
@@ -35,8 +37,9 @@
 ## Boundary decisions (why these lines)
 
 - **Autonomy line:** any action that changes commercial or physical state is a Phase-3 candidate. In Phase 2, the agent only *prepares* such actions and never executes them.
-- **Model line:** we do not train new models. We reuse existing dbt marts and use a hosted LLM behind allow-listed tools.
+- **Model line:** we do not train new models. Reviewed Phase-1 semantic definitions may inform PostgreSQL/dbt-core models, but no existing mart is assumed to be available. A hosted LLM is proposed behind allow-listed tools; provider selection remains open.
 - **Evaluation line:** we run a *controlled UAT experiment*, not a production A/B. Labelling honesty is a hard requirement.
+- **Architecture line:** AWS and the simple target stack are owner constraints; component, workflow, persistence, and tool designs remain proposals until M0 review.
 
 ## Scope-change control
 

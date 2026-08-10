@@ -1,6 +1,6 @@
 # 08 — Evaluation & Golden-Case Plan
 
-> Owner: Scout. Reviewer: Fizz.
+> Owner: Scout. Reviewer: Fizz. Status: **plan; no evaluation has been run for StockoutOps Live**.
 
 ## Evaluation layers
 
@@ -44,7 +44,7 @@ Minimum coverage before G1 → G2 promotion:
 - Unnecessary tool calls (count).
 - Correct escalation flag (binary).
 - Latency (ms).
-- Cost (LLM tokens, warehouse credits).
+- Cost (LLM tokens plus attributable AWS/RDS/ECS/S3 usage under the accepted method).
 
 ## Aggregate gates
 

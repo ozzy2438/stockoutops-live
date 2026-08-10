@@ -1,6 +1,6 @@
 # Project Kickoff (verbatim)
 
-> This is the exact kickoff message posted to the `Production-Ready-Real-World` channel. It is preserved here as authoritative context for anyone picking up the project.
+> **Historical transcript, not current authority.** This is the exact original kickoff message posted to the `Production-Ready-Real-World` channel. Later owner decisions supersede its “convert the Snowflake/dbt system” wording: StockoutOps Live is a new AWS-targeted implementation, the old Snowflake account is closed, and PharmaRetail is reference material only. Use `context_handoff.md`, `00_project_charter.md`, `05_architecture_v2.md`, and accepted ADRs for current direction.
 
 ---
 
