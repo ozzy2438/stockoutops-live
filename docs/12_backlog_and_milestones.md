@@ -43,20 +43,66 @@ M0 is approved only when all of the following live evidence exists:
 5. The PR is squash-merged and the authoritative files are verified on GitHub `main`.
 6. Osman explicitly records that M0 is approved and M1 may begin.
 
-Issue and PR state are the live gate record; this static file does not duplicate their changing checkboxes. M0 approval accepts the planning scaffold as the handoff baseline. It does **not** implement the architecture or silently accept OD-01 through OD-13. Each deferred decision in `13_risks_and_open_decisions.md` gates its dependent M1 work.
+Issue and PR state are the live gate record; this static file does not duplicate their changing checkboxes. M0 approval accepts the planning scaffold as the handoff baseline. It does **not** implement the architecture or silently accept OD-01 through OD-13. An open decision in `13_risks_and_open_decisions.md` gates only work that depends on its still-open scope; the narrow M1 subsets accepted below do not close the broader production decisions.
 
-## Milestone 1 — Historical Replay (G0)
+## Milestone 1 — Smallest human-supervised vertical slice
 
-- [ ] M1-01 — Skeleton repo layout for `src/` finalised (framework choice ADR merged).
-- [ ] M1-02 — Deterministic outer loop (intake, guardrails, workflow engine, audit).
-- [ ] M1-03 — Tool layer T1–T6 implemented under the accepted v2 contracts; T7 remains draft-only.
-- [ ] M1-04 — Prompt / tool / model registry.
-- [ ] M1-05 — Golden-case suite (≥ 34 cases) + replay harness.
-- [ ] M1-06 — CI wires golden-case suite (block on regression).
-- [ ] M1-07 — Observability wiring + operational dashboard v1.
-- [ ] M1-08 — Cloud deployment (staging) with auth + RBAC.
-- [ ] M1-09 — Baseline measurement run on manual investigations.
-- [ ] M1-10 — G0 exit gate report + Fizz `APPROVE`.
+> **Authoritative owner scope.** M1 is one local/containerised engineering slice over one canonical simulated stockout case. It is not G0, staging, production operation, or evidence of model quality or business impact.
+
+### Scope-locked path
+
+1. Accept one investigation request and persist one durable `run_id`.
+2. Resolve simulated identity, tenant, and role server-side; fail closed on invalid or cross-tenant access.
+3. Retrieve only T1 inventory, T2 sales/demand, and T3 supplier evidence from governed versioned fixtures.
+4. Validate 3/3 evidence freshness, contract, provenance, and citation IDs before reasoning.
+5. Invoke the OpenAI Responses API at most once per normal run, using exact snapshot `gpt-5-nano-2025-08-07`, no tools, and strict structured output for only a cited root-cause hypothesis and recommendation draft. CI uses a deterministic stub only.
+6. Present cited findings through the minimal review surface and persist Approve / Edit / Reject / Escalate.
+7. Append every accepted transition and rejected control attempt to the audit trail.
+8. Resume safely after restart and retry without duplicate internal actions.
+
+### M1 subset decision mapping
+
+The ADRs accept only the following local M1 subsets. `docs/13` remains the source of truth for the broader open decisions.
+
+| Open decision | Accepted M1 subset | Scope that remains open after this PR |
+|---|---|---|
+| OD-01 | ADR-0002: OpenAI Responses API, exact `gpt-5-nano-2025-08-07` snapshot, strict output, no tools | Provider fallback, replacement-model choice, production provider strategy |
+| OD-02 | ADR-0003: explicit Python state machine for one local single-writer slice | Distributed workflow engine, scheduling, leasing, and multi-writer recovery |
+| OD-03 | ADR-0004: local PostgreSQL 16 state, audit, idempotency, and provenance subset | RLS, outbox, backup/PITR, restore drill, production schema and recovery |
+| OD-05 | ADR-0005: local server-derived simulated identity and tenant fixtures | Real IdP, sessions, MFA, RBAC, provisioning, and production tenant model |
+| OD-06 | ADR-0003: one same-origin server-rendered Jinja review page | Production UI technology, accessibility, browser security, and routing |
+| OD-07 | ADR-0004: fixture-backed T1–T3 canonical-case contracts only | Real source systems, dbt-core boundary, T4–T6, and production freshness agreements |
+| OD-13 | ADR-0004: T1–T3 `v1` fields, provenance, freshness, and citation rules only | Acceptance of the broader v2 tool catalogue and evidence rubric |
+
+OD-04 and OD-08 through OD-12 remain fully open. They do not authorise additional M1 work; any future dependent work stays blocked until its own decision gate is satisfied.
+
+### Work packages and dependencies
+
+- [ ] M1-SL — Documentation scope lock: issue, ADR-0002–0005, this checklist, exact-head Fizz `APPROVE`, merge, and Ozzy implementation approval.
+- [ ] M1-I1 — Bumble implementation PR: explicit control spine, local PostgreSQL, simulated identity, T1–T3 fixtures, bounded adapters, API and minimal review page. **Blocked by M1-SL.**
+- [ ] M1-E1 — Scout evidence PR: clean-container run, exact-head CI, fixture hashes, structured result, UI smoke artefact, restart/retry result, audit export, limitations, measured live-call latency/tokens/cost where authorised. **Blocked by M1-I1.**
+- [ ] M1-A1 — Fizz final milestone assurance on the exact evidence head. `APPROVE` is the only passing verdict.
+
+### Definition of Done
+
+- One accepted request retains one `run_id` across process restart.
+- Missing/invalid identity and cross-tenant requests fail closed; measured fixture leakage is zero.
+- T1–T3 retrieval is 3/3 and claim citation coverage is 100%; stale, missing, invalid, or provenance-incomplete evidence stops before the model.
+- CI uses only the deterministic stub. Before the sole manual live smoke, Bumble verifies credential, billing/project, and exact-snapshot access without exposing or persisting the key.
+- A normal run makes no more than one model call. Strict-schema, citation, refusal, timeout, and budget failures are rejected, audited, and escalated.
+- Approve / Edit / Reject / Escalate are all persisted with reviewer, tenant, timestamps, reason where required, original/edited payload where applicable, and bound draft hash/expiry.
+- The append-only audit reconstructs the current state; mutation attempts are rejected.
+- Repeated intake/review requests create zero duplicate runs, decisions, or model invocations. This is an internal-action result; M1 performs no external write.
+- Evidence includes reproducible local/container commands, exact commit, fixture manifest/hashes, structured output, audit export, UI smoke artefact, security/privacy and cost notes, recovery/rollback, and documented limitations.
+- Fizz returns `APPROVE` on the exact evidence head. Tests alone do not complete M1.
+
+### Explicitly out of scope
+
+AWS deployment; T4–T7; external tasks or notifications; ≥34-case suite; full IdP, session, MFA, or RLS; distributed workflow execution; production operation; adoption, ROI, SLO, or reasoning-quality claims.
+
+### Deferred from the former large M1
+
+The former M1-01–M1-10 package is preserved but is not executable M1 authority. Framework hardening, T4–T6, registries beyond required version pins, ≥34 golden cases, regression gating, dashboards, AWS staging/auth/RBAC, baseline measurement, and G0 reporting require later owner sequencing after this slice. They must not be pulled into M1 without a written scope decision.
 
 ## Milestone 2 — Shadow Mode (G1)
 
@@ -69,7 +115,7 @@ Issue and PR state are the live gate record; this static file does not duplicate
 
 ## Milestone 3 — Assisted Operation (G2)
 
-- [ ] M3-01 — Approve / edit / reject / escalate UI.
+- [ ] M3-01 — Production hardening of the M1 review UI, identity, accessibility, and escalation routing.
 - [ ] M3-02 — Write executor (T7 realisation) with idempotency.
 - [ ] M3-03 — Feature flags & fast rollback.
 - [ ] M3-04 — First failure-injection round (FI-1, FI-2, FI-3).
