@@ -44,4 +44,3 @@ The authoritative list is `13_risks_and_open_decisions.md`. The items most likel
 - LLM provider/model and prompt/response retention;
 - human-review UI technology and approved task/notification integration;
 - dbt-core boundary, cost attribution, and evaluation/UAT definitions.
-

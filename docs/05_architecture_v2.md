@@ -153,4 +153,3 @@ M0 acceptance requires Honey’s architecture review, threat-model diff, Fizz ve
 - LLM provider, retention, cost attribution, and external task integration.
 
 No part of this proposal authorises Milestone-1 implementation.
-

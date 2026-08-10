@@ -125,4 +125,3 @@ Audit logging, authorisation, freshness checks, state transitions, approval vali
 ## Versioning and change control
 
 Every run pins application, prompt, model, policy-corpus, and tool-schema versions. Adding, removing, renaming, or materially changing a proposed tool requires an ADR, threat-model diff, independent review, and Fizz sign-off. Acceptance of this document itself requires the M0 verdict; until then it is a design baseline only.
-

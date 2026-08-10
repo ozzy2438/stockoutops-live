@@ -57,4 +57,3 @@ Do not create application code, tests, Docker images, AWS resources, database sc
 - Current authority: owner decisions, project charter, accepted ADRs, risks/open decisions, and the reviewed architecture/tool documents.
 - `kickoff_message.md` is a historical transcript and is non-authoritative where later owner decisions supersede it.
 - If documents disagree, stop, open an issue, and resolve the conflict in the authoritative document and any dependent summaries.
-

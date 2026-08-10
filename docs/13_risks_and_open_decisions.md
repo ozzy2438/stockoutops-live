@@ -64,4 +64,3 @@ Architecture v2, the workflow-engine choice, persistence design, and v2 tool con
 ## Change log
 
 - 2026-08-10 — Reconciled owner decisions, retired Snowflake assumptions, and separated settled constraints from M0 proposals.
-
