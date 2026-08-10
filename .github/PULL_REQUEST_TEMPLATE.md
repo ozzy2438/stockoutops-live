@@ -32,6 +32,10 @@ Closes #
 <!-- Link tests, eval runs, screenshots, dashboards, log excerpts. -->
 <!-- Clearly label each item as MEASURED / SIMULATED / ASSUMED / TARGET. -->
 
+## Threat-model diff
+
+<!-- Required for changes to tools, RBAC/RLS, data contracts, LLM/egress, retention, or autonomy. Describe changed trust boundaries, threats, and mitigations; otherwise write N/A with a reason. -->
+
 ## Risk & rollback
 
 - Risk level: `low` | `medium` | `high`

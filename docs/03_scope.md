@@ -39,7 +39,7 @@
 - **Autonomy line:** any action that changes commercial or physical state is a Phase-3 candidate. In Phase 2, the agent only *prepares* such actions and never executes them.
 - **Model line:** we do not train new models. Reviewed Phase-1 semantic definitions may inform PostgreSQL/dbt-core models, but no existing mart is assumed to be available. A hosted LLM is proposed behind allow-listed tools; provider selection remains open.
 - **Evaluation line:** we run a *controlled UAT experiment*, not a production A/B. Labelling honesty is a hard requirement.
-- **Architecture line:** AWS and the simple target stack are owner constraints; component, workflow, persistence, and tool designs remain proposals until M0 review.
+- **Architecture line:** AWS and the simple target stack are owner constraints. Component, workflow, persistence, and tool designs are M0 proposals; accepting the scaffold does not decide unresolved options, which require accepted ADRs or contracts before dependent implementation.
 
 ## Scope-change control
 

@@ -2,11 +2,11 @@
 
 **Human-Supervised AI Decisioning & Reliability Platform**
 
-> **Current status: Milestone 0 planning scaffold.** No application code, agent, database, AWS resource, production service, or accepted v2 architecture exists yet.
+> **Current implementation status: planning-only scaffold.** No application code, agent, database, AWS resource, or production service exists. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
 
 StockoutOps Live is the new canonical Phase-2 implementation. The [PharmaRetail AI Control Tower](https://github.com/ozzy2438/PharmaRetail-AI-Control-Tower) is reference material only; useful patterns may be selectively migrated after review, but the old project is not a runtime dependency or a codebase to copy wholesale.
 
-AWS is the target cloud. The preferred simple stack is Python, PostgreSQL/Amazon RDS, S3 where needed, dbt-core where justified, FastAPI, a lightweight human-review UI, Docker, ECS Fargate, CloudWatch, Secrets Manager, and GitHub Actions. Architecture v2, workflow engine, persistence design, and tool contracts remain proposals until Milestone-0 review.
+AWS is the target cloud. The preferred simple stack is Python, PostgreSQL/Amazon RDS, S3 where needed, dbt-core where justified, FastAPI, a lightweight human-review UI, Docker, ECS Fargate, CloudWatch, Secrets Manager, and GitHub Actions. Architecture v2, workflow engine, persistence design, and tool contracts are Milestone-0 proposals. Accepting the planning scaffold does not select unresolved technical options; accepted ADRs govern implementation.
 
 ---
 
@@ -87,7 +87,7 @@ The project is done **only** when all of the following are true:
 - User acceptance / edit / reject evidence.
 - Traceable Issue → Branch → PR → independent review → Release history.
 - Architecture, tool contracts, threat model, runbooks, system card.
-- Independent final assurance by **Fizz**.
+- Independent final **APPROVE** verdict by **Fizz**.
 - Honest live-status label.
 
 ### Honest labelling
@@ -108,6 +108,8 @@ The project is done **only** when all of the following are true:
 | Fizz | Independent risk review, adversarial tests, failure injection, release verdict (APPROVE / APPROVE WITH CONDITIONS / BLOCK) |
 
 Fizz does **not** report into the implementation team.
+
+Only `APPROVE` opens a milestone gate. `APPROVE WITH CONDITIONS` pauses merge and progression until the conditions are resolved and Fizz approves the new head; `BLOCK` stops the milestone.
 
 ## 8. Repository Map
 

@@ -39,7 +39,7 @@
 
 - Duration: 8–12 weeks.
 - Requirements: scheduled runs, release history, weekly evaluation reports, incident post-mortems for any SEV1/2, cost report monthly.
-- Exit criteria: Definition of Done in `README.md` §6 satisfied; Fizz final verdict.
+- Exit criteria: Definition of Done in `README.md` §6 satisfied; Fizz final `APPROVE`.
 
 ## Feature-flag policy
 

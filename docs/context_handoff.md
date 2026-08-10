@@ -1,6 +1,6 @@
 # Milestone-0 Context Handoff
 
-> Read this first. This repository contains planning and governance scaffolding only. There is no application implementation, production service, cloud deployment, or accepted v2 architecture yet.
+> Read this first. This repository contains planning and governance scaffolding only. There is no application implementation, production service, cloud deployment, or implemented v2 architecture.
 
 ## Canonical context
 
@@ -20,7 +20,7 @@
 - Failure injection and honest MEASURED / SIMULATED / ASSUMED / TARGET labels.
 - Issue → branch → PR → independent review → merge.
 - Passing tests alone do not complete a milestone.
-- Fizz may return APPROVE, APPROVE WITH CONDITIONS, or BLOCK.
+- Only Fizz `APPROVE` opens a milestone gate. `APPROVE WITH CONDITIONS` pauses merge until resolution and re-review; `BLOCK` stops the milestone.
 
 ## M0 handoff state
 
@@ -30,9 +30,9 @@
 - The seven proposed v2 tool names are preserved in `06_workflow_and_tool_contracts.md` and are explicitly not described as the exact Phase-1 seven.
 - Snowflake assumptions have been removed from the current target architecture, threat model, environment template, and operating plans.
 
-These documents are ready for review, not accepted. M0 checkboxes stay open until their issue/PR evidence, independent review, and verdict exist.
+Document presence does not prove M0 approval. The authoritative gate and verdict semantics are in `12_backlog_and_milestones.md`; live evidence is the linked GitHub issue and PR.
 
-## Proposals still requiring review
+## Deferred technical decisions
 
 - Architecture component boundaries.
 - Workflow-engine approach.
@@ -40,15 +40,15 @@ These documents are ready for review, not accepted. M0 checkboxes stay open unti
 - v2 tool schemas and evidence rubric.
 - UI technology, identity/tenant model, source-data contracts, dbt-core boundary, and external task integration.
 
-The complete decision list is `13_risks_and_open_decisions.md`.
+M0 approval may accept the planning scaffold without selecting these options. The complete decision list and the implementation point each item gates are in `13_risks_and_open_decisions.md`.
 
 ## Required close-out sequence
 
-1. Review `00_project_charter.md`, `01_current_state_audit.md`, `02_gap_matrix.md`, `03_scope.md`, `05_architecture_v2.md`, `06_workflow_and_tool_contracts.md`, `07_threat_model.md`, and `13_risks_and_open_decisions.md`.
-2. Resolve or explicitly defer the blocking decisions through ADRs.
-3. Obtain Honey, Bumble, and Scout reviews for their assigned sections.
-4. Obtain the independent Fizz M0 verdict; a BLOCK stops the milestone.
-5. Record Osman’s approval before any Milestone-1 work.
+1. Complete the owner-authorised M0 consolidation issue and PR, including its threat-model diff.
+2. Pass required CI and Markdown checks on the exact PR head.
+3. Obtain independent Fizz `APPROVE` for that exact head. A conditional verdict pauses merge; `BLOCK` stops the milestone.
+4. Squash-merge only after `APPROVE`, then verify the authoritative files on GitHub `main`.
+5. Record Osman’s explicit approval before any Milestone-1 work.
 
 Do not create application code, tests, Docker images, AWS resources, database schemas, or an agent during M0 close-out.
 

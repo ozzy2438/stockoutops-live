@@ -7,7 +7,7 @@
 - **Controlled UAT experiment.** A randomised operator study conducted with limited traffic and sample size; not a commercial production A/B test.
 - **Definition of Done (DoD).** The full set of conditions in `README.md` §6 required to close the project.
 - **Feature flag.** A toggle controlling behaviour at runtime; used to gate rollout and enable rollback.
-- **Fizz verdict.** APPROVE / APPROVE WITH CONDITIONS / BLOCK issued at every milestone gate by independent assurance.
+- **Fizz verdict.** Independent assurance result at a milestone gate. Only `APPROVE` opens the gate; `APPROVE WITH CONDITIONS` pauses merge until resolution and re-review; `BLOCK` stops the milestone.
 - **Golden case.** A curated case with expected root cause, evidence, tool set, and escalation flag used for regression.
 - **Historical replay (G0).** Blind rerun of past resolved cases in staging.
 - **RLS.** Row-level security proposed at the PostgreSQL data boundary and backed by application-level tenant checks.

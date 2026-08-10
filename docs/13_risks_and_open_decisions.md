@@ -4,7 +4,7 @@
 
 ## Owner-set constraints
 
-These are inputs to M0 review, not claims that the architecture is implemented:
+These are owner constraints, not claims that the architecture is implemented:
 
 - **C-01** — `stockoutops-live` is the canonical Phase-2 repository.
 - **C-02** — PharmaRetail AI Control Tower is reference material only; migration is selective and reviewed.
@@ -14,7 +14,7 @@ These are inputs to M0 review, not claims that the architecture is implemented:
 - **C-06** — Major platforms outside that baseline require a later ADR demonstrating a real need.
 - **C-07** — A2 approve-to-act and the delivery, provenance, audit, tenancy, observability, failure-injection, honest-labelling, and Fizz-blocking principles are non-negotiable.
 
-Architecture v2, the workflow-engine choice, persistence design, and v2 tool contracts remain proposals until M0 review.
+Architecture v2, the workflow-engine choice, persistence design, and v2 tool contracts are M0 proposals. M0 approval accepts the scaffold as a planning baseline; it does not close the open decisions below or represent implementation.
 
 ## Risks
 
@@ -26,7 +26,7 @@ Architecture v2, the workflow-engine choice, persistence design, and v2 tool con
 | R-04 | Cross-tenant or role-scope leakage | L | Critical | Honey/Fizz | Server-derived identity, PostgreSQL controls, blocking isolation tests, FI-4. |
 | R-05 | Golden cases do not represent live investigations | M | Medium | Scout | Blinded review, provenance labels, disagreement analysis, refresh on incidents. |
 | R-06 | Operator study is underpowered or poorly defined | M | Medium | Scout | Pre-register population, boundaries, sample size, and confidence intervals. |
-| R-07 | Autonomy scope creeps beyond A2 | M | High | Fizz | Pin autonomy; require ADR, owner approval, rollout evidence, and Fizz verdict. |
+| R-07 | Autonomy scope creeps beyond A2 | M | High | Fizz | Pin autonomy; require ADR, owner approval, rollout evidence, and Fizz `APPROVE`. |
 | R-08 | LLM-provider lock-in | M | Medium | Honey | Stable adapter and versioned evaluation under ADR-0002. |
 | R-09 | RDS/ECS/S3 capacity or cost spikes | M | Medium | Bumble | Query/row/time caps, connection limits, tagging, budgets, and load evidence before scaling. |
 | R-10 | Team over-claims production status or evidence | M | High | Orchestrator/Fizz | Mandatory MEASURED/SIMULATED/ASSUMED/TARGET labels and review of external claims. |

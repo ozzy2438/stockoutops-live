@@ -1,8 +1,8 @@
 # 05 — Architecture v2: AWS Target Proposal
 
-> Owner: Honey. Reviewer: Fizz. Status: **proposal for Milestone-0 review; not implemented or accepted**.
+> Owner: Honey. Reviewer: Fizz. Status: **proposed Milestone-0 planning baseline; not implemented**.
 
-AWS is the owner-selected target cloud. The component boundaries, workflow-engine choice, persistence schema, and tool contracts below remain proposals until the M0 review records a decision. No production service or cloud resource exists in this repository.
+AWS is the owner-selected target cloud. M0 approval may accept this document as a planning baseline, but it does not select the open workflow-engine, persistence-schema, identity, UI, or tool-contract options. Those choices require the decisions listed in `13_risks_and_open_decisions.md` before dependent implementation. No production service or cloud resource exists in this repository.
 
 ## Constraints
 
@@ -117,7 +117,7 @@ PostgreSQL on Amazon RDS is the default candidate for the first operational syst
 
 Source documents and large immutable evaluation artifacts may live in S3; PostgreSQL stores their URI, content hash, classification, version, and tenant scope. dbt-core is proposed only for transformations that are clearer, testable, and reusable as data models; it is not required for transactional workflow state.
 
-The table/schema layout, PostgreSQL RLS policy, partitioning, retention, backup, and recovery design remain subject to M0 review.
+The table/schema layout, PostgreSQL RLS policy, partitioning, retention, backup, and recovery design remain open and require accepted decisions before implementation.
 
 ## Deployment and operations proposal
 
@@ -143,7 +143,7 @@ All values are **TARGET**, not measured:
 
 ## Review gates
 
-M0 acceptance requires Honey’s architecture review, threat-model diff, Fizz verdict, and Osman approval. The review must explicitly resolve or defer:
+M0 acceptance follows the authoritative gate in `12_backlog_and_milestones.md`: green required checks, a PR-body threat-model diff, Fizz `APPROVE` on the exact head, merge, verification of `main`, and Osman’s explicit approval. `APPROVE WITH CONDITIONS` pauses merge; `BLOCK` stops the milestone. The planning review records the following as resolved or explicitly deferred:
 
 - workflow-engine approach;
 - persistence schema and approval/outbox transaction boundary;

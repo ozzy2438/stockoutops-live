@@ -1,6 +1,6 @@
 # 0002. Choose LLM provider & model family
 
-- **Status:** Proposed (stub — to be completed in M0)
+- **Status:** Proposed (deferred stub — required before model-backed implementation)
 - **Date:** TBD
 - **Deciders:** Honey, Fizz, Osman
 
@@ -16,7 +16,7 @@ We need a hosted LLM with reliable function-calling and structured-output suppor
 
 ## Decision
 
-TBD. Populate before M1-01 lands.
+TBD. M0 scaffold approval does not decide the provider. Complete and accept this ADR before model-backed implementation; non-model M1 planning must not assume a provider.
 
 ## Consequences
 

@@ -44,7 +44,7 @@ When a stockout alert or investigation request is received, the platform:
 
 ## Success (top-line)
 
-The project succeeds when **all** DoD bullets in `README.md` section 6 are true, Fizz has returned a final verdict, and the honest state label matches reality. During Milestone 0 the only valid label is “planning scaffold — no application or live deployment”.
+The project succeeds when **all** DoD bullets in `README.md` section 6 are true, Fizz has returned a final `APPROVE`, and the honest state label matches reality. During Milestone 0 the only valid implementation label is “planning scaffold — no application or live deployment”.
 
 ## Stakeholders
 
@@ -71,4 +71,4 @@ Dates are set at the end of M0.
 - No new external dependency without an ADR.
 - Passing tests ≠ milestone completion.
 - Zero RLS leakage is a release-blocker.
-- No application implementation starts before the M0 verdict and Osman’s approval.
+- No application implementation starts before the M0 gate has a Fizz `APPROVE` and Osman has explicitly approved the start of M1.

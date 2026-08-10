@@ -1,30 +1,49 @@
 # 12 — Backlog & Milestones
 
-> Owner: Orchestrator. This is the ordered spine of the project. Every item becomes a GitHub Issue using the `milestone_task` template.
+> Owner: Orchestrator. This is the authoritative milestone checklist and gate process. Work normally starts from a GitHub Issue; an owner-authorised consolidation issue may cover a bounded close-out package.
+
+## Verdict semantics
+
+- `APPROVE` is the only Fizz verdict that satisfies a milestone gate and permits merge.
+- `APPROVE WITH CONDITIONS` pauses merge and progression. Resolve every condition, rerun required checks, and obtain Fizz `APPROVE` on the new exact head.
+- `BLOCK` stops the milestone until the blockers are resolved and the new exact head is reviewed.
+- Passing tests or recording a non-approval verdict never completes a milestone.
 
 ## Milestone 0 — Planning (this milestone)
 
 > **No production code.** Deliverables are documents and plans.
 
-Document presence or drafting does not check an item off. An item closes only through its issue/PR evidence and required independent review.
+### Planning-package contents
 
-- [ ] M0-01 — Current-state audit filled in (`docs/01_current_state_audit.md`) — owner: Orchestrator.
-- [ ] M0-02 — Gap-to-deliverable matrix populated (`docs/02_gap_matrix.md`) — owner: Orchestrator + Scout.
-- [ ] M0-03 — Scope definition confirmed with Osman (`docs/03_scope.md`) — owner: Orchestrator.
-- [ ] M0-04 — Baseline measurement plan (`docs/04_baseline_plan.md`) — owner: Scout.
-- [ ] M0-05 — Architecture v2 proposal (`docs/05_architecture_v2.md`) — owner: Honey.
-- [ ] M0-06 — Workflow state & tool contracts (`docs/06_workflow_and_tool_contracts.md`) — owner: Honey.
-- [ ] M0-07 — Threat model & privacy (`docs/07_threat_model.md`) — owner: Honey.
-- [ ] M0-08 — Evaluation & golden-case plan (`docs/08_evaluation_plan.md`) — owner: Scout.
-- [ ] M0-09 — Rollout plan G0→G4 (`docs/09_rollout_plan.md`) — owner: Bumble + Scout.
-- [ ] M0-10 — Observability, SLO & cost plan (`docs/10_observability_slo_cost.md`) — owner: Bumble.
-- [ ] M0-11 — Failure-injection scenarios v1 (`docs/11_failure_injection.md`) — owner: Fizz + Bumble.
-- [ ] M0-12 — Prioritised issue & milestone breakdown (this doc, plus GitHub Milestones created).
-- [ ] M0-13 — Risks, assumptions & open decisions (`docs/13_risks_and_open_decisions.md`) — owner: Orchestrator.
-- [ ] M0-14 — ADR framework initialised (`docs/decisions/`) with ADR-0001 and ADR-0002 stub.
-- [ ] M0-15 — Fizz independent review of M0 with verdict APPROVE / APPROVE WITH CONDITIONS / BLOCK.
+These checks mean the scaffold artifact is populated and ready for the consolidated M0 gate. They do not claim that a proposed architecture choice is implemented or that an open decision is accepted.
 
-**Exit criteria M0:** all above checked and Osman approves start of M1.
+- [x] M0-01 — Current-state audit populated (`docs/01_current_state_audit.md`).
+- [x] M0-02 — Gap-to-deliverable matrix populated (`docs/02_gap_matrix.md`).
+- [x] M0-03 — Owner scope and constraints recorded (`docs/03_scope.md`).
+- [x] M0-04 — Baseline measurement plan recorded (`docs/04_baseline_plan.md`).
+- [x] M0-05 — AWS-targeted Architecture v2 proposal recorded (`docs/05_architecture_v2.md`).
+- [x] M0-06 — Workflow-state and proposed v2 tool-contract baseline recorded (`docs/06_workflow_and_tool_contracts.md`).
+- [x] M0-07 — Threat-model and privacy proposal recorded (`docs/07_threat_model.md`).
+- [x] M0-08 — Evaluation and golden-case plan recorded (`docs/08_evaluation_plan.md`).
+- [x] M0-09 — Rollout plan G0→G4 recorded (`docs/09_rollout_plan.md`).
+- [x] M0-10 — Observability, SLO, and cost plan recorded (`docs/10_observability_slo_cost.md`).
+- [x] M0-11 — Six initial failure-injection designs recorded (`docs/11_failure_injection.md`); none is claimed as executed.
+- [x] M0-12 — Prioritised backlog and milestone breakdown recorded in this document.
+- [x] M0-13 — Risks, assumptions, and open decisions recorded (`docs/13_risks_and_open_decisions.md`).
+- [x] M0-14 — ADR framework initialised with accepted ADR-0001 and a deliberately deferred ADR-0002 stub.
+
+### Authoritative M0 acceptance gate
+
+M0 is approved only when all of the following live evidence exists:
+
+1. The owner-authorised consolidation issue defines the M0-only scope and acceptance criteria.
+2. Its PR targets `main`, contains no application/test/service implementation, and includes the required threat-model diff.
+3. Required CI and Markdown checks pass on the exact PR head.
+4. Fizz records `APPROVE` for that exact head. A conditional verdict pauses merge; `BLOCK` stops the milestone.
+5. The PR is squash-merged and the authoritative files are verified on GitHub `main`.
+6. Osman explicitly records that M0 is approved and M1 may begin.
+
+Issue and PR state are the live gate record; this static file does not duplicate their changing checkboxes. M0 approval accepts the planning scaffold as the handoff baseline. It does **not** implement the architecture or silently accept OD-01 through OD-13. Each deferred decision in `13_risks_and_open_decisions.md` gates its dependent M1 work.
 
 ## Milestone 1 — Historical Replay (G0)
 
@@ -37,7 +56,7 @@ Document presence or drafting does not check an item off. An item closes only th
 - [ ] M1-07 — Observability wiring + operational dashboard v1.
 - [ ] M1-08 — Cloud deployment (staging) with auth + RBAC.
 - [ ] M1-09 — Baseline measurement run on manual investigations.
-- [ ] M1-10 — G0 exit gate report + Fizz verdict.
+- [ ] M1-10 — G0 exit gate report + Fizz `APPROVE`.
 
 ## Milestone 2 — Shadow Mode (G1)
 
@@ -46,7 +65,7 @@ Document presence or drafting does not check an item off. An item closes only th
 - [ ] M2-03 — UAT user recruitment (≥ 3) + consent forms.
 - [ ] M2-04 — SLO alerts wired.
 - [ ] M2-05 — First 100 shadow cases analysed; disagreement characterisation.
-- [ ] M2-06 — G1 exit gate report + Fizz verdict.
+- [ ] M2-06 — G1 exit gate report + Fizz `APPROVE`.
 
 ## Milestone 3 — Assisted Operation (G2)
 
@@ -56,7 +75,7 @@ Document presence or drafting does not check an item off. An item closes only th
 - [ ] M3-04 — First failure-injection round (FI-1, FI-2, FI-3).
 - [ ] M3-05 — Operator study protocol pre-registered.
 - [ ] M3-06 — 4-week assisted operation with weekly reports.
-- [ ] M3-07 — G2 exit gate report + Fizz verdict.
+- [ ] M3-07 — G2 exit gate report + Fizz `APPROVE`.
 
 ## Milestone 4 — Low-Risk Canary (G3)
 
@@ -65,7 +84,7 @@ Document presence or drafting does not check an item off. An item closes only th
 - [ ] M4-03 — Failure-injection round 2 (FI-4, FI-5, FI-6).
 - [ ] M4-04 — At least one real incident post-mortem.
 - [ ] M4-05 — Canary passes SLOs ≥ 2 weeks.
-- [ ] M4-06 — G3 exit gate report + Fizz verdict.
+- [ ] M4-06 — G3 exit gate report + Fizz `APPROVE`.
 
 ## Milestone 5 — Controlled Operation (G4)
 
@@ -74,7 +93,7 @@ Document presence or drafting does not check an item off. An item closes only th
 - [ ] M5-03 — Baseline vs assisted comparison report.
 - [ ] M5-04 — Operator-study results published (as *controlled UAT experiment*).
 - [ ] M5-05 — System card finalised.
-- [ ] M5-06 — Fizz final verdict + honest live-status label committed.
+- [ ] M5-06 — Fizz final `APPROVE` + honest live-status label committed.
 
 ## Cross-cutting continuous work
 

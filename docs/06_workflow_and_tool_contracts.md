@@ -1,6 +1,6 @@
 # 06 — Workflow State and Proposed v2 Tool Contracts
 
-> Owner: Honey. Reviewer: Fizz. Status: **proposal for Milestone-0 review; not implemented or accepted**.
+> Owner: Honey. Reviewer: Fizz. Status: **proposed Milestone-0 planning baseline; not implemented**.
 
 The catalogue below currently contains seven proposed v2 tools. It is derived from Phase-1 lessons but is **not** the exact seven-tool set from PharmaRetail. See `01_current_state_audit.md` for the Phase-1 names and disposition.
 
@@ -124,4 +124,4 @@ Audit logging, authorisation, freshness checks, state transitions, approval vali
 
 ## Versioning and change control
 
-Every run pins application, prompt, model, policy-corpus, and tool-schema versions. Adding, removing, renaming, or materially changing a proposed tool requires an ADR, threat-model diff, independent review, and Fizz sign-off. Acceptance of this document itself requires the M0 verdict; until then it is a design baseline only.
+Every run pins application, prompt, model, policy-corpus, and tool-schema versions. Adding, removing, renaming, or materially changing a proposed tool requires an ADR, threat-model diff, independent review, and Fizz sign-off. M0 approval may accept this catalogue as the planning baseline, but the schemas and evidence rubric remain open under OD-13 and must be accepted before tool implementation.

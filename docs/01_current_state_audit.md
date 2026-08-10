@@ -55,10 +55,10 @@ The proposed v2 catalogue in `06_workflow_and_tool_contracts.md` is a new set de
 | SOP metadata, effective-date filtering, citation format, and evaluation cases | **HARDEN** | Retain the governed-evidence ideas; redesign storage for PostgreSQL/S3 and expand beyond the small synthetic corpus. |
 | Deterministic control spine, allow-listed calls, fail-closed checks, and draft-only action invariant | **HARDEN** | Add durable `run_id` state, tenant identity, resumability, idempotency, approval binding, and bounded LLM reasoning. |
 | Phase-1 seven-tool catalogue | **REPLACE** | Use the proposed v2 catalogue as the review baseline. `log_ai_interaction` becomes a control-spine responsibility, while v2 adds explicit demand and similar-incident evidence capabilities. |
-| Query-hash audit and Snowflake action-draft persistence | **REPLACE** | Propose PostgreSQL workflow/event/approval/outbox persistence; final schema remains subject to M0 review. |
+| Query-hash audit and Snowflake action-draft persistence | **REPLACE** | Propose PostgreSQL workflow/event/approval/outbox persistence; the final schema requires an accepted persistence decision before implementation. |
 | Snowflake DDL, warehouses, roles, policies, connectors, service identities, and Snowflake deployment workflows | **RETIRE** | The account is closed and Snowflake is not a Phase-2 target dependency. Preserve only design lessons in this audit. |
 | User-selectable role/scope simulation | **REPLACE** | Authorisation must come from authenticated server-side identity and tenant context. |
-| Streamlit demo implementation | **REPLACE** | Preserve useful review-screen interaction ideas, but use FastAPI plus a lightweight human-review UI selected during M0 review. |
+| Streamlit demo implementation | **REPLACE** | Preserve useful review-screen interaction ideas, but use FastAPI plus a lightweight human-review UI selected through an accepted decision before UI implementation. |
 | Phase-1 GitHub Actions and test organisation | **HARDEN** | Keep workflow separation and blocking checks; replace Snowflake jobs with Docker/AWS/RDS/dbt-core checks only when Milestone 1 is authorised. |
 | [Phase-1 `project.md`](https://github.com/ozzy2438/PharmaRetail-AI-Control-Tower/blob/main/project.md) and Phase-1 architecture claims | **RETIRE as authority** | Keep as historical reference only. Current decisions live in the StockoutOps Live charter, ADRs, risks, and reviewed architecture. |
 

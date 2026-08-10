@@ -30,13 +30,13 @@
 | 15 | Baseline vs assisted workflow comparison | **ABSENT** | Execute the pre-registered baseline and controlled comparison. | Scout | M2–M3 | TARGET |
 | 16 | Acceptance/edit/reject evidence | **ABSENT** | Persist real review decisions and report them without fabricated users. | Scout | M3 | TARGET |
 | 17 | Traceable Issue → branch → PR → independent review → release history | **PARTIAL** — Phase-1 issue/PR/CI history is useful; the Phase-2 review/release chain is not yet established. | Enforce branch protection and preserve independent review evidence for every milestone. | Orchestrator | Continuous | MEASURED / TARGET |
-| 18 | Architecture, tool contracts, threat model, runbooks, and system card | **PARTIAL** — M0 documents exist, but architecture, persistence, workflow, and tools are proposals; runbooks are an index. | Complete M0 review, resolve blocking ADRs, and record Fizz verdict. | Honey/Fizz | M0 | MEASURED / TARGET |
-| 19 | Independent final assurance | **ABSENT** | Fizz must issue a recorded verdict and may BLOCK. | Fizz | M5 | TARGET |
+| 18 | Architecture, tool contracts, threat model, runbooks, and system card | **PARTIAL** — M0 documents exist, but architecture, persistence, workflow, and tools are proposals; runbooks are an index. | Accept the M0 planning baseline through the authoritative gate; resolve each deferred technical decision before its dependent implementation. | Honey/Fizz | M0–M1 | MEASURED / TARGET |
+| 19 | Independent final assurance | **ABSENT** | Fizz must issue a recorded final `APPROVE`; a conditional verdict pauses and `BLOCK` stops the gate. | Fizz | M5 | TARGET |
 | 20 | Honest live-status label | **PARTIAL** — the repository now correctly says “Milestone 0, no implementation”; the final operating label depends on later evidence. | Re-evaluate at every gate and before any external claim. | Orchestrator/Fizz | Continuous/M5 | MEASURED / TARGET |
 
-## Blocking M0 review decisions
+## Deferred technical decisions
 
-The authoritative list is `13_risks_and_open_decisions.md`. The items most likely to block Milestone 1 are:
+The authoritative list is `13_risks_and_open_decisions.md`. M0 scaffold acceptance does not decide these items. Each must be resolved or explicitly deferred before the dependent Milestone-1 implementation begins:
 
 - workflow-engine approach and durable PostgreSQL persistence design;
 - AWS region, network/ingress, identity provider, and tenant-authorisation model;
