@@ -1,5 +1,5 @@
-# CI — Milestone-0 documentation and repository-hygiene checks only.
-# Application and test jobs are added after M0 approval; this workflow is not milestone evidence by itself.
+# CI — repository hygiene plus the local-only deterministic M1 implementation checks.
+# No OpenAI secret, model network call, AWS resource, or external write is used.
 name: ci
 
 on:
@@ -33,3 +33,64 @@ jobs:
           globs: |
             **/*.md
             !node_modules
+
+  m1-local:
+    name: M1 local deterministic slice
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: stockoutops
+          POSTGRES_USER: stockoutops_migration
+          POSTGRES_PASSWORD: migration-local-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stockoutops_migration -d stockoutops"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      APP_ENV: local
+      IDENTITY_PROVIDER: simulated
+      SIMULATED_IDENTITIES_FILE: .local/identities.json
+      REASONING_PROVIDER: stub
+      DATABASE_URL: postgresql://stockoutops_app:app-local-only@localhost:5432/stockoutops
+      TEST_DATABASE_URL: postgresql://stockoutops_app:app-local-only@localhost:5432/stockoutops
+      MIGRATION_DATABASE_URL: postgresql://stockoutops_migration:migration-local-only@localhost:5432/stockoutops
+      APP_DB_PASSWORD: app-local-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install local and test dependencies
+        run: pip install -e ".[test]"
+      - name: Create ignored simulated identities
+        run: python scripts/create_local_identities.py
+      - name: Verify fixtures and migrate empty PostgreSQL
+        run: |
+          python -c "from pathlib import Path; from stockoutops.evidence.manifest import verify_manifest; print(verify_manifest(Path('fixtures/v1')))"
+          python -m stockoutops.database
+          python -m stockoutops.database
+          python -m stockoutops.evidence.seed
+      - name: Lint and format
+        run: |
+          ruff format --check .
+          ruff check .
+      - name: Unit and PostgreSQL integration tests
+        run: pytest
+      - name: Deterministic stub end-to-end smoke
+        run: |
+          uvicorn stockoutops.app:create_app --factory --host 127.0.0.1 --port 8000 &
+          app_pid=$!
+          trap 'kill "$app_pid"' EXIT
+          for attempt in {1..20}; do
+            curl --fail --silent http://127.0.0.1:8000/healthz && break
+            sleep 1
+          done
+          python -m stockoutops.smoke
+      - name: Build application image
+        run: docker build -t stockoutops-live:m1-ci .

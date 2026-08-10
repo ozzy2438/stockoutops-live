@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: stockoutops
+      POSTGRES_USER: stockoutops_migration
+      POSTGRES_PASSWORD: migration-local-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockoutops_migration -d stockoutops"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "5432:5432"
+    volumes:
+      - stockoutops_pgdata:/var/lib/postgresql/data
+
+  migrate:
+    build: .
+    user: root
+    command: ["python", "-m", "stockoutops.database"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://stockoutops_migration:migration-local-only@db:5432/stockoutops
+      APP_DB_PASSWORD: app-local-only
+    depends_on:
+      db:
+        condition: service_healthy
+
+  seed:
+    build: .
+    user: root
+    command: ["python", "-m", "stockoutops.evidence.seed"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://stockoutops_migration:migration-local-only@db:5432/stockoutops
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  app:
+    build: .
+    environment:
+      APP_ENV: local
+      IDENTITY_PROVIDER: simulated
+      SIMULATED_IDENTITIES_FILE: /run/stockoutops/identities.json
+      REASONING_PROVIDER: stub
+      DATABASE_URL: postgresql://stockoutops_app:app-local-only@db:5432/stockoutops
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./.local/identities.json:/run/stockoutops/identities.json:ro
+
+volumes:
+  stockoutops_pgdata:
