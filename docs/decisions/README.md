@@ -25,4 +25,7 @@ We use lightweight ADRs (Michael Nygard style) to record decisions that constrai
 ## Index
 
 - `0001-record-architecture-decisions.md` — Accepted.
-- `0002-choose-llm-provider.md` — Stub (Proposed).
+- `0002-choose-llm-provider.md` — Accepted for M1; effective after scope-lock merge.
+- `0003-use-explicit-m1-state-machine.md` — Accepted for M1; effective after scope-lock merge.
+- `0004-use-local-postgres-for-m1-state-and-evidence.md` — Accepted for M1; effective after scope-lock merge.
+- `0005-use-local-simulated-identity-for-m1.md` — Accepted for local M1; effective after scope-lock merge.
