@@ -1,0 +1,40 @@
+# CODEOWNERS — StockoutOps Live
+#
+# GitHub usernames are placeholders mapped to Buzz roles until real handles are assigned.
+# Replace @orchestrator, @honey, @bumble, @scout, @fizz with real GitHub logins.
+
+# Default: any change needs at least one core reviewer.
+*                                       @ozzy2438
+
+# Governance & docs — Orchestrator + Fizz for major changes
+/README.md                              @ozzy2438
+/CONTRIBUTING.md                        @ozzy2438
+/SECURITY.md                            @ozzy2438
+/CODE_OF_CONDUCT.md                     @ozzy2438
+/docs/00_project_charter.md             @ozzy2438
+/docs/03_scope.md                       @ozzy2438
+/docs/12_backlog_and_milestones.md      @ozzy2438
+/docs/13_risks_and_open_decisions.md    @ozzy2438
+
+# Architecture, contracts, threat model — Honey (+ Fizz)
+/docs/05_architecture_v2.md             @ozzy2438
+/docs/06_workflow_and_tool_contracts.md @ozzy2438
+/docs/07_threat_model.md                @ozzy2438
+/docs/decisions/                        @ozzy2438
+
+# Implementation / infra / observability — Bumble
+/src/                                   @ozzy2438
+/infra/                                 @ozzy2438
+/observability/                         @ozzy2438
+/docs/10_observability_slo_cost.md      @ozzy2438
+/docs/runbooks/                         @ozzy2438
+
+# Evaluation, UAT, golden cases — Scout
+/evaluation/                            @ozzy2438
+/docs/04_baseline_plan.md               @ozzy2438
+/docs/08_evaluation_plan.md             @ozzy2438
+/docs/09_rollout_plan.md                @ozzy2438
+
+# Failure injection, adversarial, release verdict — Fizz (mandatory reviewer)
+/docs/11_failure_injection.md           @ozzy2438
+/.github/workflows/                     @ozzy2438
