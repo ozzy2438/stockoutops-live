@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>StockoutOps M1 Review</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 60rem; }
+      label, button { display: block; margin-top: 0.8rem; }
+      input, textarea { box-sizing: border-box; padding: 0.5rem; width: 100%; }
+      textarea { min-height: 12rem; }
+      button { display: inline-block; margin-right: 0.5rem; padding: 0.6rem 1rem; }
+      pre { background: #f4f4f4; overflow: auto; padding: 1rem; }
+      .warning { border-left: 0.3rem solid #b45309; padding-left: 0.8rem; }
+    </style>
+  </head>
+  <body>
+    <h1>StockoutOps M1 human review</h1>
+    <p class="warning">
+      Local simulated slice only. The bearer token remains in browser memory and is
+      sent only in the Authorization header. Do not capture it in screenshots.
+    </p>
+    <label for="token">Local bearer token</label>
+    <input id="token" type="password" autocomplete="off">
+    <label for="run-id">Run ID</label>
+    <input id="run-id" autocomplete="off">
+    <button id="load" type="button">Load investigation</button>
+
+    <h2>Evidence and cited draft</h2>
+    <pre id="evidence">Load a run to view cited evidence.</pre>
+    <label for="draft">Draft JSON</label>
+    <textarea id="draft" spellcheck="false"></textarea>
+    <label for="reason">Reason (required for Reject or Escalate)</label>
+    <textarea id="reason"></textarea>
+    <div>
+      <button data-action="approve" type="button">Approve</button>
+      <button data-action="edit_approve" type="button">Edit and Approve</button>
+      <button data-action="reject" type="button">Reject</button>
+      <button data-action="escalate" type="button">Escalate</button>
+    </div>
+    <pre id="result" aria-live="polite"></pre>
+
+    <script>
+      (() => {
+        let bearerToken = "";
+        let currentRun = null;
+        const tokenInput = document.getElementById("token");
+        const runInput = document.getElementById("run-id");
+        const evidence = document.getElementById("evidence");
+        const draft = document.getElementById("draft");
+        const reason = document.getElementById("reason");
+        const result = document.getElementById("result");
+
+        const headers = () => ({
+          "Authorization": `Bearer ${bearerToken}`,
+          "Content-Type": "application/json",
+        });
+
+        document.getElementById("load").addEventListener("click", async () => {
+          bearerToken = tokenInput.value;
+          tokenInput.value = "";
+          const response = await fetch(
+            `/v1/investigations/${encodeURIComponent(runInput.value)}`,
+            { headers: headers() },
+          );
+          currentRun = await response.json();
+          if (!response.ok) {
+            result.textContent = JSON.stringify(currentRun, null, 2);
+            currentRun = null;
+            return;
+          }
+          evidence.textContent = JSON.stringify(currentRun.evidence, null, 2);
+          draft.value = JSON.stringify(currentRun.draft, null, 2);
+          result.textContent = `State: ${currentRun.state}`;
+        });
+
+        document.querySelectorAll("button[data-action]").forEach((button) => {
+          button.addEventListener("click", async () => {
+            if (!currentRun) {
+              result.textContent = "Load an investigation first.";
+              return;
+            }
+            const action = button.dataset.action;
+            const payload = { action, draft_hash: currentRun.draft_hash };
+            if (action === "edit_approve") payload.edited_payload = JSON.parse(draft.value);
+            if (action === "reject" || action === "escalate") payload.reason = reason.value;
+            const response = await fetch(
+              `/v1/investigations/${encodeURIComponent(currentRun.run_id)}/review`,
+              {
+                method: "POST",
+                headers: { ...headers(), "Idempotency-Key": crypto.randomUUID() },
+                body: JSON.stringify(payload),
+              },
+            );
+            result.textContent = JSON.stringify(await response.json(), null, 2);
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

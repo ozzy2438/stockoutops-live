@@ -1,0 +1,8 @@
+{
+  "fixture_manifest_version": "v1-2026-08-10",
+  "files": {
+    "demand.csv": "f066d1ec5ac317a8efded873a0882ecae63ddc053fef9e927c117bff26df2f5b",
+    "inventory.csv": "38685d072c52ab96c5765ffa5f0f467fe1f6c78a2a554d65c8d5b53cd75ca4ac",
+    "supplier.csv": "6e46c68cfedb07f86ce96637c8e778b5288f1c70af0869de8bc53a75cf19ae94"
+  }
+}
