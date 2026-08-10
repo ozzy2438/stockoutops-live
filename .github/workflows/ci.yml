@@ -1,0 +1,52 @@
+# CI — static checks and (later) unit tests.
+# Milestone 0: only lint & doc checks run. Real test steps are added when src/ lands.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs-lint:
+    name: Docs & repo hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required governance files exist
+        run: |
+          for f in README.md LICENSE CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md \
+                   .github/CODEOWNERS .github/PULL_REQUEST_TEMPLATE.md \
+                   docs/00_project_charter.md docs/05_architecture_v2.md \
+                   docs/07_threat_model.md docs/09_rollout_plan.md \
+                   docs/12_backlog_and_milestones.md; do
+            test -f "$f" || { echo "Missing required file: $f"; exit 1; }
+          done
+      - name: Markdown lint
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: |
+            **/*.md
+            !node_modules
+
+  # Placeholder jobs enabled when code lands.
+  python-tests:
+    name: Python tests (placeholder)
+    runs-on: ubuntu-latest
+    if: hashFiles('pyproject.toml') != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -e ".[dev]" || echo "no package yet"
+      - name: Ruff
+        run: pip install ruff && ruff check . || true
+      - name: Pytest
+        run: pip install pytest && pytest -q || echo "no tests yet"

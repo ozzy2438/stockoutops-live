@@ -1,0 +1,40 @@
+# Evaluation harness: golden cases, shadow-mode diffs, replay.
+# This is a skeleton — real steps come in M1+.
+name: evaluation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "evaluation/**"
+      - "src/**"
+      - ".github/workflows/evaluation.yml"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Which eval to run"
+        required: true
+        default: "replay"
+        type: choice
+        options: [replay, shadow, uat-summary]
+
+jobs:
+  replay:
+    name: Historical replay (G0)
+    runs-on: ubuntu-latest
+    if: github.event.inputs.mode == 'replay' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: |
+          echo "Replay harness not yet implemented."
+          echo "See docs/08_evaluation_plan.md and evaluation/replay/README.md."
+
+  shadow-diff:
+    name: Shadow-mode diff report
+    runs-on: ubuntu-latest
+    if: github.event.inputs.mode == 'shadow'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: echo "Shadow-mode diff report not yet implemented."
