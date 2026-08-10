@@ -15,6 +15,7 @@ Sources:
 
 - [GPT-5 nano model catalogue](https://developers.openai.com/api/docs/models/gpt-5-nano)
 - [Structured model outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
+- [OpenAI API data controls and endpoint retention](https://developers.openai.com/api/docs/guides/your-data#default-usage-policies-by-endpoint)
 
 ## Decision
 
@@ -31,7 +32,8 @@ Sources:
 - Deterministic post-response validation requires every cited `evidence_id` to exist in the pre-call bundle. Strict schema conformance is necessary but not sufficient.
 - CI uses `DeterministicStubAdapter` only, with no network and no API key.
 - One manual live smoke call is permitted during Bumble's implementation milestone, immediately before the first real model call. Before it, Bumble must verify credential presence without disclosure, API authentication, project billing/access, and exact snapshot access. No other agent session requests, inspects, or inherits `OPENAI_API_KEY`.
-- Store by default: model ID, prompt hash, input/output hashes, token usage, latency, and estimated cost. Do not store raw prompt or response bodies by default.
+- Every M1 Responses request must set `store: false`. Background mode is forbidden; the sole smoke is synchronous and bounded.
+- Store in StockoutOps by default: model ID, prompt hash, input/output hashes, token usage, latency, and estimated cost. Do not store raw prompt or response bodies.
 - The smoke result is MEASURED at n=1 for interface/latency/cost only. It is not evidence of reasoning quality, production readiness, reliability, or business impact.
 
 M1 request caps are `max_output_tokens: 1500`, a 12,000-token application-side input ceiling, and a 30-second wall-clock timeout. Input overflow is rejected before the API call; output exhaustion or timeout escalates.
@@ -40,6 +42,7 @@ M1 request caps are `max_output_tokens: 1500`, a 12,000-token application-side i
 
 - The snapshot is owner-pinned for reproducibility but is already marked deprecated in the current official catalogue. If pre-call access verification fails, Bumble must stop and return to Ozzy; no alias or replacement model may be substituted silently.
 - Pricing is a current catalogue input to an estimate, not a guaranteed invoice rate. The implementation records the price version/date and measured token usage.
+- `store: false` disables Responses application-state storage for this request; it is not by itself Zero Data Retention. Unless the project has separately approved Zero Data Retention or Modified Abuse Monitoring, provider abuse-monitoring logs may contain customer content and are retained for up to 30 days by default. M1 therefore permits only simulated payloads. Real, personal, client, or tenant data is forbidden until data classification, retention, and owner approval are recorded.
 - Provider fallback, quality evaluation, 34-case regression, prompt-injection corpus, PII redaction pipeline, retention policy, and production data approval remain outside M1.
 - The adapter boundary remains provider-neutral; OpenAI SDK types must not leak into evidence or workflow contracts.
 
@@ -48,7 +51,7 @@ M1 request caps are `max_output_tokens: 1500`, a 12,000-token application-side i
 - Adds one outbound trust boundary from the control spine to the allow-listed OpenAI Responses endpoint.
 - Only validated simulated T1–T3 fields cross that boundary in M1; no secrets, identity tokens, raw audit records, or arbitrary retrieved text are included.
 - No model-callable tools removes tool-confusion and model-initiated side effects from this slice.
-- Residual risks are provider availability, deprecation/access loss, data egress, output hallucination, latency, and cost. Timeout, strict schema, citation binding, hashing, metadata-only retention, and human review reduce but do not eliminate them.
+- Residual risks are provider availability, deprecation/access loss, data egress, provider abuse-monitoring retention, output hallucination, latency, and cost. `store: false`, the background-mode prohibition, simulated-only payloads, timeout, strict schema, citation binding, hashing, StockoutOps metadata-only retention, and human review reduce but do not eliminate them.
 
 ## Recovery and rollback
 

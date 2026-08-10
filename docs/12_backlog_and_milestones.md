@@ -43,7 +43,7 @@ M0 is approved only when all of the following live evidence exists:
 5. The PR is squash-merged and the authoritative files are verified on GitHub `main`.
 6. Osman explicitly records that M0 is approved and M1 may begin.
 
-Issue and PR state are the live gate record; this static file does not duplicate their changing checkboxes. M0 approval accepts the planning scaffold as the handoff baseline. It does **not** implement the architecture or silently accept OD-01 through OD-13. Each deferred decision in `13_risks_and_open_decisions.md` gates its dependent M1 work.
+Issue and PR state are the live gate record; this static file does not duplicate their changing checkboxes. M0 approval accepts the planning scaffold as the handoff baseline. It does **not** implement the architecture or silently accept OD-01 through OD-13. An open decision in `13_risks_and_open_decisions.md` gates only work that depends on its still-open scope; the narrow M1 subsets accepted below do not close the broader production decisions.
 
 ## Milestone 1 — Smallest human-supervised vertical slice
 
@@ -59,6 +59,22 @@ Issue and PR state are the live gate record; this static file does not duplicate
 6. Present cited findings through the minimal review surface and persist Approve / Edit / Reject / Escalate.
 7. Append every accepted transition and rejected control attempt to the audit trail.
 8. Resume safely after restart and retry without duplicate internal actions.
+
+### M1 subset decision mapping
+
+The ADRs accept only the following local M1 subsets. `docs/13` remains the source of truth for the broader open decisions.
+
+| Open decision | Accepted M1 subset | Scope that remains open after this PR |
+|---|---|---|
+| OD-01 | ADR-0002: OpenAI Responses API, exact `gpt-5-nano-2025-08-07` snapshot, strict output, no tools | Provider fallback, replacement-model choice, production provider strategy |
+| OD-02 | ADR-0003: explicit Python state machine for one local single-writer slice | Distributed workflow engine, scheduling, leasing, and multi-writer recovery |
+| OD-03 | ADR-0004: local PostgreSQL 16 state, audit, idempotency, and provenance subset | RLS, outbox, backup/PITR, restore drill, production schema and recovery |
+| OD-05 | ADR-0005: local server-derived simulated identity and tenant fixtures | Real IdP, sessions, MFA, RBAC, provisioning, and production tenant model |
+| OD-06 | ADR-0003: one same-origin server-rendered Jinja review page | Production UI technology, accessibility, browser security, and routing |
+| OD-07 | ADR-0004: fixture-backed T1–T3 canonical-case contracts only | Real source systems, dbt-core boundary, T4–T6, and production freshness agreements |
+| OD-13 | ADR-0004: T1–T3 `v1` fields, provenance, freshness, and citation rules only | Acceptance of the broader v2 tool catalogue and evidence rubric |
+
+OD-04 and OD-08 through OD-12 remain fully open. They do not authorise additional M1 work; any future dependent work stays blocked until its own decision gate is satisfied.
 
 ### Work packages and dependencies
 
