@@ -16,22 +16,22 @@ labels: ["failure-injection", "reliability"]
 ## Setup
 
 - Environment: `staging` / `prod-canary`
-- Blast radius: 
-- Feature flag / kill switch: 
-- Owners on standby: 
+- Blast radius:
+- Feature flag / kill switch:
+- Owners on standby:
 
 ## Steps
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ## Observations
 
-- Alerts fired: 
-- Human intervention needed: 
-- Agent behaviour: 
-- Recovery time: 
+- Alerts fired:
+- Human intervention needed:
+- Agent behaviour:
+- Recovery time:
 
 ## Result
 
@@ -41,6 +41,6 @@ labels: ["failure-injection", "reliability"]
 
 ## Follow-ups
 
-- Issues opened: 
-- Runbook updates: 
-- Fizz review link: 
+- Issues opened:
+- Runbook updates:
+- Fizz review link:

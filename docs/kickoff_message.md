@@ -1,6 +1,6 @@
 # Project Kickoff (verbatim)
 
-> This is the exact kickoff message posted to the `Production-Ready-Real-World` channel. It is preserved here as authoritative context for anyone picking up the project.
+> **Historical transcript, not current authority.** This is the exact original kickoff message posted to the `Production-Ready-Real-World` channel. Later owner decisions supersede its “convert the Snowflake/dbt system” wording: StockoutOps Live is a new AWS-targeted implementation, the old Snowflake account is closed, and PharmaRetail is reference material only. Use `context_handoff.md`, `00_project_charter.md`, `05_architecture_v2.md`, and accepted ADRs for current direction.
 
 ---
 
@@ -15,6 +15,7 @@
 **Initial autonomy:** A2 — approve-to-act.
 
 **Allowed initial outcomes:**
+
 - read and analyse governed data
 - prepare investigation pack
 - recommend recovery action
@@ -22,6 +23,7 @@
 - create an approved low-risk task after human approval
 
 **Forbidden:**
+
 - automatic purchase-order changes
 - automatic inventory transfers
 - pricing or promotion changes
@@ -31,6 +33,7 @@
 - direct unrestricted database writes
 
 **Team ownership:**
+
 - Orchestrator: scope, milestone plan, backlog, dependencies and gates
 - Honey: architecture, contracts, durable state, RBAC, threat model and SLOs
 - Bumble: implementation, deployment, CI/CD, observability and recovery
@@ -38,6 +41,7 @@
 - Fizz: independent assurance and release verdict
 
 **Operating rules:**
+
 - Keep scope tightly constrained.
 - Do not add technologies without a written reason.
 - Work through issue → branch → PR → independent review → merge → release.
@@ -49,6 +53,7 @@
 - High-impact decisions must be escalated to Osman.
 
 **Milestone 0:** *Do not implement production code yet.* Produce:
+
 1. Current-state repository and evidence audit.
 2. Gap-to-deliverable matrix.
 3. Exact in-scope and out-of-scope definition.

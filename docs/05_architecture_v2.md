@@ -1,121 +1,155 @@
-# 05 — Architecture v2
+# 05 — Architecture v2: AWS Target Proposal
 
-> Owner: Honey. Reviewer: Fizz. Status: **proposal, subject to M0 review**.
+> Owner: Honey. Reviewer: Fizz. Status: **proposed Milestone-0 planning baseline; not implemented**.
+
+AWS is the owner-selected target cloud. M0 approval may accept this document as a planning baseline, but it does not select the open workflow-engine, persistence-schema, identity, UI, or tool-contract options. Those choices require the decisions listed in `13_risks_and_open_decisions.md` before dependent implementation. No production service or cloud resource exists in this repository.
+
+## Constraints
+
+- Python
+- PostgreSQL / Amazon RDS
+- Amazon S3 only where object storage is required
+- dbt-core only where transformations justify it
+- FastAPI
+- lightweight human-review web UI
+- Docker
+- AWS ECS Fargate
+- Amazon CloudWatch
+- AWS Secrets Manager
+- GitHub Actions
+
+Kafka, Kubernetes, Databricks, Airflow, Snowflake, MLflow, and other major platforms are outside the baseline. Adding one requires a later ADR with evidence that the simple stack cannot meet a concrete requirement.
 
 ## Design principles
 
-1. **Deterministic outer loop, bounded agent inner loop.** Identity, authorization, freshness, approval, write, and audit are deterministic code paths. Agentic reasoning is used only where genuine uncertainty exists (root-cause hypothesis, evidence framing, recommendation drafting).
-2. **Every run has a durable `run_id`.** State survives process restarts; each step is idempotent and replayable.
-3. **Tools are contracts, not calls.** The agent may only invoke allow-listed tools with schema-validated arguments. No free-form SQL, no shell.
-4. **Human is a first-class step**, not an afterthought. Approve/edit/reject/escalate is modelled as an explicit workflow state.
-5. **Everything is observable.** Structured logs, traces spanning tool calls, metrics, cost telemetry, and lineage.
-6. **Fail closed.** On any authorization, freshness, or contract violation, the workflow halts and escalates.
+1. **Deterministic control spine; bounded AI reasoning.** Identity, tenancy, authorisation, freshness, state transitions, approval, writes, and audit are deterministic. AI is limited to uncertain analysis and drafting.
+2. **A2 approve-to-act.** No external write occurs before a valid human approval bound to the same `run_id` and proposed payload.
+3. **Durable and replayable.** Every investigation receives a `run_id` before evidence gathering. Steps are idempotent, resumable, and auditable.
+4. **Allow-listed, contract-first tools.** No free-form SQL, shell, or arbitrary HTTP is exposed to the model.
+5. **Provenance before persuasion.** Findings and recommendations cite retrieved evidence; missing or stale evidence fails closed.
+6. **Tenant isolation in depth.** Server-derived identity, application authorisation, PostgreSQL controls, and tests all enforce scope.
+7. **Observable by default.** Logs, metrics, traces, costs, approvals, failures, and version identifiers correlate on `run_id`.
+8. **Smallest sufficient platform.** Prefer explicit Python and PostgreSQL behavior over new infrastructure.
 
-## High-level components
+## Proposed component view
 
-```
-           +----------------------+
-           |  Alert / Request     |
-           |  (webhook, UI, cron) |
-           +----------+-----------+
-                      |
-                      v
-           +----------------------+       +-----------------------+
-           |  Intake & Guardrails |------>|  Identity / Tenant /  |
-           |  (deterministic)     |       |  Eligibility / Fresh  |
-           +----------+-----------+       +-----------------------+
-                      |
-                      v
-           +----------------------+       +-----------------------+
-           |  Workflow Engine     |<----->|  Durable State Store  |
-           |  (run_id, steps)     |       |  (append-only + KV)   |
-           +----------+-----------+       +-----------------------+
-                      |
-                      v
-           +----------------------+       +-----------------------+
-           |  Tool Layer          |<----->|  Governed Data Marts  |
-           |  (allow-listed 7)    |       |  (Snowflake + RLS)    |
-           +----------+-----------+       +-----------------------+
-                      |
-                      v
-           +----------------------+       +-----------------------+
-           |  Agent (LLM)         |------>|  Prompt/Tool Registry |
-           |  bounded reasoning   |       |  (versioned)          |
-           +----------+-----------+       +-----------------------+
-                      |
-                      v
-           +----------------------+       +-----------------------+
-           |  Recommendation Pack |------>|  Human Review UI      |
-           |  (cited)             |       |  (approve/edit/rej.)  |
-           +----------+-----------+       +-----------------------+
-                      |
-                      v
-           +----------------------+       +-----------------------+
-           |  Write Executor      |------>|  Incident / Task /    |
-           |  (post-approval)     |       |  Notification systems |
-           +----------+-----------+       +-----------------------+
-                      |
-                      v
-           +----------------------+       +-----------------------+
-           |  Audit + Outcome     |------>|  Observability stack  |
-           |  logging             |       |  (logs/traces/metrics)|
-           +----------------------+       +-----------------------+
+```text
+Authenticated operator
+        |
+        v
+Lightweight review UI
+        |
+        v
+FastAPI boundary ---------------------------------------------------+
+        |                                                           |
+        v                                                           |
+Deterministic control spine                                         |
+(intake, authz, state, budgets, approval, idempotency)               |
+        |                         |                                  |
+        |                         +--> bounded LLM adapter            |
+        v                                                            |
+Proposed v2 tool layer                                               |
+        |                                                            |
+        +--> Amazon RDS for PostgreSQL                               |
+        |    operational data, run state, events, approvals,         |
+        |    provenance, version registry, action outbox              |
+        |                                                            |
+        +--> Amazon S3                                               |
+        |    immutable source documents and large eval artifacts      |
+        |                                                            |
+        +--> approved task/notification system, post-approval only ---+
+
+Docker containers on AWS ECS Fargate
+CloudWatch for logs, metrics, traces, dashboards, and alerts
+Secrets Manager for runtime secrets
+GitHub Actions for reviewed build/deploy automation
+dbt-core -> PostgreSQL only for justified repeatable transformations
 ```
 
-## Component notes
+The diagram is a target proposal, not proof that these components exist.
 
-### Intake & Guardrails
-- Rejects requests missing tenant, identity, or required fields.
-- Verifies data freshness against per-mart SLAs; halts with `DATA_STALE` on violation.
-- Emits `intake.accepted` / `intake.rejected` events.
+## Proposed runtime responsibilities
 
-### Workflow Engine
-- Durable, resumable, idempotent steps.
-- Each step writes to append-only event log with `run_id`, `tenant_id`, `actor`, `timestamp`, `step`, `input_hash`, `output_hash`.
-- Supported step states: `pending`, `running`, `succeeded`, `failed`, `awaiting_human`, `escalated`, `cancelled`.
+### FastAPI and review UI
 
-### Tool Layer
-- Exactly the 7 allow-listed tools from PharmaRetail (see `docs/06_workflow_and_tool_contracts.md`).
-- All arguments are JSON-schema validated **before** execution.
-- All results carry a citation object (source mart, filter, row-count, freshness).
-- Tools run under the caller’s RBAC + RLS scope; no service-account escalation.
+- FastAPI is the only application boundary exposed to the UI and integration clients.
+- The server, not the browser, derives actor, tenant, role, and eligible scope.
+- The UI presents evidence, provenance, uncertainty, and the exact proposed write payload.
+- Review outcomes are **approve**, **edit then approve**, **reject with reason**, and **escalate**.
+- The UI framework, identity provider, and AWS ingress design remain open decisions.
 
-### Agent
-- LLM behind a stable adapter interface (provider swap is one-line).
-- Prompts, tool schemas, and stopping criteria are versioned in a registry; each run records the exact versions used.
-- Enforced maximum tool calls per run, maximum tokens per call, maximum wall-clock.
-- Structured outputs only; unstructured text is treated as untrusted commentary.
+### Deterministic control spine
 
-### Human Review UI
-- Presents: root-cause hypothesis, evidence citations, affected scope, proposed action, risk flags.
-- Actions: **Approve**, **Edit-then-approve**, **Reject with reason**, **Escalate**.
-- No action can be taken until required citations are present and freshness is green.
+- Assign `run_id` at intake and enforce the reviewed workflow transition table.
+- Apply authentication, tenant, authorisation, freshness, budget, and tool-contract gates.
+- Pause durably at human review and resume without repeating successful side effects.
+- Bind approval to `run_id`, reviewer, tool/payload hash, expiry, and tenant.
+- Use idempotency keys and an outbox-style boundary for post-approval writes.
 
-### Write Executor
-- Only path that mutates external systems (incident / task / notification).
-- Runs strictly after human approval; carries the approval token and reviewer id.
-- Emits `write.attempted`, `write.succeeded`, `write.failed` events.
+The implementation approach—small explicit Python state machine versus an adopted workflow library—remains open. Any engine outside the preferred stack requires an ADR.
 
-### Audit + Observability
-- Append-only audit log is the source of truth.
-- OpenTelemetry traces link user click → workflow step → tool call → LLM call → write.
-- Cost telemetry attached to each `run_id` (LLM tokens, warehouse credits, minutes).
+### Bounded reasoning
 
-## Non-functional targets (initial)
+- The model receives only redacted, authorised evidence and the proposed tool schemas.
+- Maximum tool calls, tokens, wall time, and output schema are deterministic configuration.
+- Model output is untrusted until schema, evidence, policy, and approval checks pass.
+- Provider and model remain open under ADR-0002.
 
-| Dimension | Target (M2 canary) |
-|-----------|--------------------|
-| Availability | 99.5% during business hours |
-| P50 investigation latency | ≤ 60s from intake to recommendation |
-| P95 investigation latency | ≤ 180s |
-| RLS leakage | 0 (release-blocker if > 0) |
-| Unsupported claim rate | ≤ 2% in golden-case suite |
-| Cost per investigation | tracked; no target until baseline is measured |
+### Proposed v2 tool layer
 
-## Trust boundaries
+- The current proposal contains seven v2 tool names in `06_workflow_and_tool_contracts.md`.
+- They are derived from Phase-1 lessons; they are not “exactly the seven tools from PharmaRetail”.
+- Tool invocations execute under server-derived tenant and actor scope and return machine-readable provenance.
+- Audit logging is a control-spine responsibility, not an eighth model-callable tool.
 
-See `docs/07_threat_model.md` for the STRIDE analysis and the trust-boundary diagram diff process.
+## Proposed persistence design
 
-## Change control
+PostgreSQL on Amazon RDS is the default candidate for the first operational system of record. The logical design is:
 
-Any change to this document requires an ADR under `docs/decisions/` and Fizz sign-off.
+| Record | Purpose |
+|---|---|
+| investigation run | current state, tenant, actor, timestamps, configuration/version pins |
+| workflow event | append-only transition and integrity evidence |
+| tool invocation | validated arguments/results hashes, latency, outcome, provenance |
+| review decision | reviewer, decision, reason, approved payload hash, expiry |
+| action outbox | idempotent post-approval write intent and delivery outcome |
+| version registry | model, prompt, policy-corpus, tool-schema, and application versions |
+
+Source documents and large immutable evaluation artifacts may live in S3; PostgreSQL stores their URI, content hash, classification, version, and tenant scope. dbt-core is proposed only for transformations that are clearer, testable, and reusable as data models; it is not required for transactional workflow state.
+
+The table/schema layout, PostgreSQL RLS policy, partitioning, retention, backup, and recovery design remain open and require accepted decisions before implementation.
+
+## Deployment and operations proposal
+
+- Package the API/control spine and UI as Docker images.
+- Run the smallest sufficient number of ECS Fargate services/tasks; API/worker separation is decided from measured workload needs.
+- Send structured logs, metrics, and traces to CloudWatch with `run_id` and `tenant_id` correlation.
+- Store service secrets in Secrets Manager; no static AWS credentials in the repository or container images.
+- Use GitHub Actions for reviewed CI/CD. AWS authentication should use a short-lived/OIDC path if approved.
+- No Snowflake compatibility layer or migration bridge is part of the target.
+
+## Initial targets
+
+All values are **TARGET**, not measured:
+
+| Dimension | Initial target |
+|---|---|
+| Availability | 99.5% during agreed business hours |
+| P50 intake-to-recommendation latency | ≤ 60 seconds |
+| P95 intake-to-recommendation latency | ≤ 180 seconds |
+| Cross-tenant or unauthorised leakage | 0; release blocker |
+| Unsupported claim rate | ≤ 2% in the reviewed golden suite |
+| Cost per investigation | measured before a numeric target is accepted |
+
+## Review gates
+
+M0 acceptance follows the authoritative gate in `12_backlog_and_milestones.md`: green required checks, a PR-body threat-model diff, Fizz `APPROVE` on the exact head, merge, verification of `main`, and Osman’s explicit approval. `APPROVE WITH CONDITIONS` pauses merge; `BLOCK` stops the milestone. The planning review records the following as resolved or explicitly deferred:
+
+- workflow-engine approach;
+- persistence schema and approval/outbox transaction boundary;
+- AWS region, networking/ingress, identity provider, and tenant model;
+- UI technology;
+- source-data and dbt-core boundary;
+- LLM provider, retention, cost attribution, and external task integration.
+
+No part of this proposal authorises Milestone-1 implementation.

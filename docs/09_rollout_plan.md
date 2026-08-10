@@ -1,6 +1,6 @@
 # 09 — Rollout Plan (Historical replay → Shadow → Assisted UAT → Canary → Controlled)
 
-> Owner: Bumble (execution) + Scout (evidence) + Fizz (verdict).
+> Owner: Bumble (execution) + Scout (evidence) + Fizz (verdict). Status: **plan; no gate has started**.
 
 ## Gate 0 — Historical replay
 
@@ -30,7 +30,7 @@
 ## Gate 3 — Low-risk canary
 
 - Environment: prod; small workload slice (≤ 10% of eligible cases OR a specific low-risk category).
-- Behaviour: onnly the *approved-task-creation* step is automated after approval; higher-risk categories remain assisted only.
+- Behaviour: only the *approved-task-creation* step is automated after approval; higher-risk categories remain assisted only.
 - Rollback: automated canary flag off; per-run kill switch.
 - Failure-injection: ≥ 3 scenarios executed here (see `11_failure_injection.md`).
 - Exit criteria: G3→G4 gate met + Fizz APPROVE.
@@ -39,7 +39,7 @@
 
 - Duration: 8–12 weeks.
 - Requirements: scheduled runs, release history, weekly evaluation reports, incident post-mortems for any SEV1/2, cost report monthly.
-- Exit criteria: Definition of Done in `README.md` §6 satisfied; Fizz final verdict.
+- Exit criteria: Definition of Done in `README.md` §6 satisfied; Fizz final `APPROVE`.
 
 ## Feature-flag policy
 

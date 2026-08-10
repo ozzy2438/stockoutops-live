@@ -2,40 +2,24 @@
 
 > No production code in this milestone. Deliverables are documents, plans, and the ADR framework.
 
-## Deliverables
+This page intentionally does not duplicate the M0 checklist or gate state.
 
-See the full checklist in `docs/12_backlog_and_milestones.md` under “Milestone 0”.
+## Authority
 
-## How to run M0
+- The single authoritative checklist, verdict semantics, and acceptance gate are in `docs/12_backlog_and_milestones.md`.
+- Deferred technical decisions and their implementation blockers are in `docs/13_risks_and_open_decisions.md`.
+- Current context for the next team is in `docs/context_handoff.md`.
 
-1. Orchestrator opens one GitHub Issue per M0 line item using the `milestone_task` template.
-2. Assign owner and independent reviewer per RACI in `docs/team/roles.md`.
-3. Each deliverable ships as a PR that updates the matching doc under `docs/`.
-4. When all M0 items are checked, Orchestrator opens the M0 review PR referencing every merged PR.
-5. **Fizz** performs independent review and posts a verdict (APPROVE / APPROVE WITH CONDITIONS / BLOCK) as a PR comment.
-6. Osman gives final approval to start M1.
+## Consolidated close-out evidence
 
-## Exit checklist
+- Scope and acceptance criteria: GitHub issue [#5](https://github.com/ozzy2438/stockoutops-live/issues/5).
+- Review, CI, Fizz verdict history, merge state, and final diff: GitHub PR [#6](https://github.com/ozzy2438/stockoutops-live/pull/6).
+- The PR/issue are the live record; do not copy their changing checkboxes into this page.
 
-- [ ] All 15 M0 items closed.
-- [ ] Fizz verdict recorded on the M0 review PR.
-- [ ] Osman approval recorded.
-- [ ] GitHub Milestones for M1–M5 created with the target dates.
-- [ ] Branch protection on `main` verified: required reviews, required status checks, no force-push, no direct commits.
+## Meaning of approval
 
-## Artifacts produced in M0 (checklist)
+M0 approval accepts a planning scaffold for handoff. It does not claim that Architecture v2 is implemented, close OD-01 through OD-13, or allow work whose prerequisite decision is unresolved.
 
-- [ ] `docs/01_current_state_audit.md` populated.
-- [ ] `docs/02_gap_matrix.md` populated.
-- [ ] `docs/03_scope.md` confirmed with Osman.
-- [ ] `docs/04_baseline_plan.md` populated & pre-registered.
-- [ ] `docs/05_architecture_v2.md` accepted.
-- [ ] `docs/06_workflow_and_tool_contracts.md` accepted.
-- [ ] `docs/07_threat_model.md` accepted.
-- [ ] `docs/08_evaluation_plan.md` accepted.
-- [ ] `docs/09_rollout_plan.md` accepted.
-- [ ] `docs/10_observability_slo_cost.md` accepted.
-- [ ] `docs/11_failure_injection.md` accepted; ≥ 6 scenarios.
-- [ ] ADR-0001 accepted; ADR-0002 (LLM provider) accepted.
-- [ ] `docs/13_risks_and_open_decisions.md` current.
-- [ ] `docs/artifacts/pii-inventory.md` created.
+Only Fizz `APPROVE` permits the M0 PR to merge. `APPROVE WITH CONDITIONS` pauses merge until every condition is resolved and the new head is approved; `BLOCK` stops the milestone.
+
+No Milestone-1 implementation belongs in this directory or the M0 close-out PR.

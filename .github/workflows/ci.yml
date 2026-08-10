@@ -1,5 +1,5 @@
-# CI — static checks and (later) unit tests.
-# Milestone 0: only lint & doc checks run. Real test steps are added when src/ lands.
+# CI — Milestone-0 documentation and repository-hygiene checks only.
+# Application and test jobs are added after M0 approval; this workflow is not milestone evidence by itself.
 name: ci
 
 on:
@@ -33,20 +33,3 @@ jobs:
           globs: |
             **/*.md
             !node_modules
-
-  # Placeholder jobs enabled when code lands.
-  python-tests:
-    name: Python tests (placeholder)
-    runs-on: ubuntu-latest
-    if: hashFiles('pyproject.toml') != ''
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install
-        run: pip install -e ".[dev]" || echo "no package yet"
-      - name: Ruff
-        run: pip install ruff && ruff check . || true
-      - name: Pytest
-        run: pip install pytest && pytest -q || echo "no tests yet"

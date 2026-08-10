@@ -2,9 +2,9 @@
 
 - **Status:** Proposed | Accepted | Superseded by ADR-XXXX | Deprecated
 - **Date:** YYYY-MM-DD
-- **Deciders:** 
-- **Consulted:** 
-- **Informed:** 
+- **Deciders:** TBD
+- **Consulted:** TBD
+- **Informed:** TBD
 
 ## Context
 
@@ -17,13 +17,16 @@
 ## Consequences
 
 ### Positive
-- 
+
+- _TBD_
 
 ### Negative / trade-offs
-- 
+
+- _TBD_
 
 ### Neutral
-- 
+
+- _TBD_
 
 ## Alternatives considered
 
@@ -33,5 +36,5 @@
 ## Follow-ups
 
 - Issues opened: #
-- Docs updated: 
-- Tests / evaluation impact: 
+- Docs updated: TBD
+- Tests / evaluation impact: TBD

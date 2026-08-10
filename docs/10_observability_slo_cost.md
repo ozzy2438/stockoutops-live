@@ -1,16 +1,19 @@
 # 10 — Observability, SLOs & Cost
 
-> Owner: Bumble (build) + Honey (design) + Fizz (assurance).
+> Owner: Bumble (build) + Honey (design) + Fizz (assurance). Status: **TARGET plan; no live signals, SLO evidence, dashboards, or alerts exist**.
 
 ## Signals
 
 ### Structured logs
+
 Every log line includes: `timestamp`, `run_id`, `tenant_id`, `actor`, `step`, `level`, `message`, `latency_ms`, `outcome`.
 
-### Traces (OpenTelemetry)
-A single trace spans: UI click → workflow step → tool call → LLM call → write. Trace id is recorded in the audit event and shown in the UI as “Run trace”.
+### Traces
+
+A single trace is proposed to span UI click → workflow step → tool call → LLM call → write. Trace id is recorded in the audit event and shown in the UI as “Run trace”. OpenTelemetry-compatible instrumentation should export to CloudWatch; the exact tracing configuration is reviewed before implementation.
 
 ### Metrics
+
 - `investigation_started_total{tenant}`
 - `investigation_completed_total{tenant,outcome}` (outcome ∈ approved/edited/rejected/escalated/failed)
 - `investigation_latency_seconds` (histogram; p50/p95)
@@ -24,6 +27,7 @@ A single trace spans: UI click → workflow step → tool call → LLM call → 
 - `feature_flag_state{flag}`
 
 ### Audit
+
 Append-only log with per-tenant partitioning; integrity-hashed periodically.
 
 ## SLOs (initial, subject to M1 measurement)
@@ -50,21 +54,22 @@ Append-only log with per-tenant partitioning; integrity-hashed periodically.
 
 - **Operational**: live SLO status, latency, tool health, active runs, error budget burn.
 - **Business**: acceptance/edit/reject rates, TTD vs baseline, top root causes, weekly volume.
-- **Cost**: cost per investigation, LLM tokens, warehouse credits, per-tenant breakdown.
+- **Cost**: cost per investigation, LLM tokens, attributable RDS/ECS/S3 usage, and per-tenant breakdown.
 - **Evaluation**: golden-case pass rate, shadow-diff agreement, drift charts.
 
 ## Cost model
 
-- **Cost per investigation** = LLM tokens × provider rate + warehouse credits × rate + fixed infra amortised per run.
+- **Proposed cost per investigation** = attributable LLM usage + attributable AWS usage + an accepted allocation of shared fixed cost.
 - Every run writes a `cost` object into its audit event.
 - Monthly cost report: total cost, cost per outcome type, cost per tenant, cost drivers (top tools).
+- The allocation method remains open under OD-09; no numeric cost claim is MEASURED until that decision and telemetry are in place.
 
 ## Retention
 
 - Metrics: 90 days at full resolution; 13 months downsampled.
 - Logs: 30 days hot; 12 months cold.
 - Audit log: ≥ 12 months.
-- LLM prompt/response bodies: 30 days redacted (default).
+- LLM prompt/response bodies: not decided (OD-10); raw-body persistence defaults off until approved.
 
 ## On-call
 

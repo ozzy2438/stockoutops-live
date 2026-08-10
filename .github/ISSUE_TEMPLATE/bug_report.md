@@ -15,22 +15,22 @@ labels: ["bug", "triage"]
 
 ## Reproduction
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ## Environment
 
 - Env: `local` / `staging` / `prod`
-- Component: 
-- Commit / release: 
-- Feature flags: 
+- Component:
+- Commit / release:
+- Feature flags:
 
 ## Impact
 
-- Users affected: 
-- Data at risk: 
-- Autonomy level in effect: 
+- Users affected:
+- Data at risk:
+- Autonomy level in effect:
 
 ## Logs / evidence
 

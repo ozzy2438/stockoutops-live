@@ -43,7 +43,7 @@ We measure the **current manual investigation process** on a defined case cohort
 ## Deliverables
 
 1. Baseline plan (this doc, finalised).
-2. Adjudication rubric (`evaluation/golden_cases/rubric.md` — stub in M0).
+2. Adjudication rubric (planned under `evaluation/golden_cases/` after M0 approval).
 3. Baseline dataset & measurement notebook.
 4. Baseline results report with confidence intervals.
 5. Pre-registration note capturing the primary metric, sample size, and stopping rules **before** comparison to assisted mode begins.

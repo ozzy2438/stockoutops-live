@@ -2,6 +2,8 @@
 
 > Owner: Honey + Orchestrator. Finalised at M5. This file is a **live scaffold** — sections are filled in as evidence accumulates.
 
+**Current status:** Milestone-0 planning only. The system described below is intended behavior, not an implemented or deployed capability.
+
 ## Purpose & intended use
 
 StockoutOps Live prepares a human-approved investigation and recovery recommendation for retail stockout / low-stock events. It is **not** an autonomous decisioning system and **not** a general-purpose assistant.
@@ -19,10 +21,10 @@ StockoutOps Live prepares a human-approved investigation and recovery recommenda
 
 ## Data
 
-- Governed marts: inventory, sales & demand, supplier, promotion, SOP corpus, incidents.
-- Freshness SLAs: per-mart (see `docs/06_workflow_and_tool_contracts.md`).
-- PII inventory: `docs/artifacts/pii-inventory.md`.
-- RLS: enforced at the warehouse layer; zero-leakage invariant.
+- Proposed evidence domains: inventory, sales and demand, supplier, promotion, SOP corpus, and incidents.
+- Freshness SLAs: source-specific values remain part of the data-contract review.
+- PII/data-classification inventory: required before M1 data access; location is not yet decided.
+- RLS: proposed for PostgreSQL with application-level tenant checks; zero-leakage invariant.
 
 ## Model & prompts
 
@@ -32,7 +34,7 @@ StockoutOps Live prepares a human-approved investigation and recovery recommenda
 
 ## Tools
 
-- 7 allow-listed tools (T1–T7) with JSON-schema contracts — see `docs/06_workflow_and_tool_contracts.md`.
+- Proposed v2 catalogue: seven allow-listed tools (T1–T7) with JSON-schema contracts. The catalogue is derived from Phase-1 lessons and is not the exact Phase-1 tool set — see `docs/06_workflow_and_tool_contracts.md`.
 - No free-form execution.
 
 ## Guardrails
@@ -66,6 +68,7 @@ StockoutOps Live prepares a human-approved investigation and recovery recommenda
 
 ## Live status label
 
-- Default: *Production-grade Stockout Investigation Platform validated through controlled UAT and failure-injection testing.*
-- If real operators use the system in a bounded process: *Human-supervised production pilot.*
+- Current: *Milestone-0 planning scaffold — no application or live deployment.*
+- After the required controlled UAT and failure-injection evidence: *Production-grade Stockout Investigation Platform validated through controlled UAT and failure-injection testing.*
+- If real operators later use the system in a bounded process: *Human-supervised production pilot.*
 - *Production-proven* is not used without real users and sustained operation.

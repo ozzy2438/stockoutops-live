@@ -7,7 +7,7 @@ This project is deliberately governed. Please read this file **before** opening 
 1. **Never push to `main`.** Every change goes through Issue → Branch → PR → independent review → merge.
 2. **No fabricated evidence.** Never invent users, clients, incidents, latency numbers, cost figures or business outcomes. Clearly distinguish *measured*, *simulated*, *assumed* and *target*.
 3. **No scope creep.** New tools, dependencies or agent capabilities require a written ADR (`docs/decisions/`) and Honey + Fizz sign-off.
-4. **Passing tests are not milestone completion.** A milestone is done only when the corresponding section of `docs/12_backlog_and_milestones.md` is fully checked and Fizz has returned a verdict.
+4. **Passing tests are not milestone completion.** A milestone gate opens only when its documented evidence is complete and Fizz returns `APPROVE`. `APPROVE WITH CONDITIONS` pauses merge until the conditions are resolved and Fizz approves the new head; `BLOCK` stops the milestone.
 5. **Autonomy stays at A2 (approve-to-act) until a documented rollout gate says otherwise.**
 
 ## Branching

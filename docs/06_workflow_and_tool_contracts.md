@@ -1,26 +1,30 @@
-# 06 — Workflow State & Tool Contracts
+# 06 — Workflow State and Proposed v2 Tool Contracts
 
-> Owner: Honey. Reviewer: Fizz. Status: **proposal**.
+> Owner: Honey. Reviewer: Fizz. Status: **proposed Milestone-0 planning baseline; not implemented**.
 
-## Workflow states
+The catalogue below currently contains seven proposed v2 tools. It is derived from Phase-1 lessons but is **not** the exact seven-tool set from PharmaRetail. See `01_current_state_audit.md` for the Phase-1 names and disposition.
 
-Each investigation is a durable workflow with a strict state machine:
+## Proposed workflow states
 
+```text
+created -> validating -> gathering_evidence -> quality_checks ->
+reasoning -> drafting_recommendation -> awaiting_human ->
+(approved | edited_and_approved | rejected | escalated) ->
+executing_write? -> recording_outcome -> closed
 ```
- created -> validating -> gathering_evidence -> quality_checks ->
- reasoning -> drafting_recommendation -> awaiting_human ->
- (approved | edited_and_approved | rejected | escalated) ->
- executing_write? -> recording_outcome -> closed
-```
 
-Invariants:
+Proposed invariants:
 
 - `run_id` is assigned at `created` and never changes.
-- Every transition writes an append-only audit event.
-- `awaiting_human` is the **only** state that can transition into `executing_write`.
-- Any exception routes to `escalated` and pauses the run.
+- Every accepted transition appends an audit event.
+- `awaiting_human` is the only state that may reach `executing_write`.
+- Approval is bound to tenant, reviewer, `run_id`, payload hash, and expiry.
+- Replays never repeat a completed external write with the same idempotency key.
+- Authorisation, stale data, contract failure, missing provenance, or exhausted budget fails closed and escalates.
 
-## Standard event envelope
+The workflow-engine and persistence implementation remain open decisions.
+
+## Proposed event envelope
 
 ```json
 {
@@ -33,73 +37,91 @@ Invariants:
   "state_to": "string",
   "input_hash": "sha256",
   "output_hash": "sha256",
-  "citations": [ { "source": "mart", "filter": {}, "row_count": 0, "freshness_ts": "iso8601" } ],
+  "citations": [
+    {
+      "source_type": "postgres|s3|external",
+      "source_ref": "stable identifier",
+      "query_or_object_hash": "sha256",
+      "retrieved_at": "iso8601",
+      "freshness_ts": "iso8601"
+    }
+  ],
   "latency_ms": 0,
-  "cost": { "llm_tokens_in": 0, "llm_tokens_out": 0, "warehouse_credits": 0.0 },
+  "cost": {
+    "llm_tokens_in": 0,
+    "llm_tokens_out": 0,
+    "db_duration_ms": 0,
+    "estimated_cost_usd": null
+  },
   "timestamp": "iso8601"
 }
 ```
 
-## Tool contracts (7 allow-listed tools)
+The final cost fields depend on the cost-attribution decision.
 
-All tools must:
+## Proposed v2 catalogue
 
-- Have a JSON schema for arguments and results.
-- Execute under the caller’s RBAC + RLS scope.
-- Return a citation object.
-- Be idempotent for identical arguments within the same `run_id`.
-- Enforce per-call token / row / time budgets.
+Every tool must have versioned JSON schemas for arguments and results, execute under server-derived RBAC/tenant scope, enforce row/time/budget limits, and return provenance sufficient to reproduce or explain the result. Identical writes within a `run_id` require idempotency protection.
 
 ### T1 — `get_inventory_snapshot`
-- **Purpose:** current stock for a SKU / store list.
-- **Args:** `sku_ids: string[]`, `store_ids: string[]`, `as_of_ts?: iso8601`.
-- **Returns:** rows of `(sku_id, store_id, on_hand, reserved, on_order, updated_at)` + citation.
-- **Guardrails:** max 500 (sku × store) pairs per call; freshness ≤ 15 min or halts.
+
+- **Purpose:** retrieve current stock for a bounded SKU/store scope.
+- **Proposed args:** `sku_ids`, `store_ids`, optional `as_of_ts`.
+- **Proposed result:** on-hand, reserved, on-order, and updated timestamp plus provenance.
+- **Guardrail:** bounded pair count and reviewed freshness SLA.
 
 ### T2 — `get_sales_and_demand`
-- **Purpose:** recent sales, velocity, demand signals.
-- **Args:** `sku_ids`, `store_ids`, `window_days` (≤ 90).
-- **Returns:** daily aggregates with confidence intervals + citation.
+
+- **Purpose:** retrieve recent sales, velocity, and approved demand signals.
+- **Proposed args:** `sku_ids`, `store_ids`, `window_days` within a reviewed maximum.
+- **Proposed result:** daily aggregates, definitions, uncertainty where applicable, and provenance.
 
 ### T3 — `get_supplier_status`
-- **Purpose:** open POs, expected receipt dates, historical lead-time.
-- **Args:** `sku_ids`, `supplier_ids?`.
-- **Returns:** open POs, expected ETA, lead-time percentiles + citation.
+
+- **Purpose:** retrieve open orders, expected receipts, and historical lead-time evidence.
+- **Proposed args:** `sku_ids` and optional `supplier_ids`.
+- **Proposed result:** order/ETA/lead-time facts and provenance.
 
 ### T4 — `get_promotion_context`
-- **Purpose:** active / upcoming promotions and campaign flags.
-- **Args:** `sku_ids`, `store_ids`, `window_days` (≤ 30).
-- **Returns:** promo definitions, uplift assumptions (labelled as ASSUMED) + citation.
+
+- **Purpose:** retrieve active or relevant promotions and approved campaign assumptions.
+- **Proposed args:** `sku_ids`, `store_ids`, and bounded `window_days`.
+- **Proposed result:** promotion definitions and explicitly labelled assumptions plus provenance.
 
 ### T5 — `search_sop_and_policy`
-- **Purpose:** retrieve approved SOP / policy passages.
-- **Args:** `query`, `topic_filter?`.
-- **Returns:** top-k passages with document id, section, effective-from date, hash + citation.
-- **Guardrails:** only from a curated policy corpus; no open web.
+
+- **Purpose:** retrieve approved SOP/policy passages.
+- **Proposed args:** `query` and optional reviewed filters.
+- **Proposed result:** bounded passages with document, version, section, effective date, content hash, and provenance.
+- **Guardrail:** curated tenant-authorised corpus only; no open web.
 
 ### T6 — `find_similar_incidents`
-- **Purpose:** prior incidents with similar SKU / store / cause fingerprint.
-- **Args:** `sku_ids`, `store_ids`, `symptom_tags`.
-- **Returns:** incident summaries with outcomes + citation.
+
+- **Purpose:** retrieve authorised prior incidents with similar SKU/store/symptom fingerprints.
+- **Proposed args:** `sku_ids`, `store_ids`, and `symptom_tags`.
+- **Proposed result:** redacted incident summaries, outcomes, similarity basis, and provenance.
 
 ### T7 — `draft_incident_or_task`
-- **Purpose:** produce a *draft* incident/task payload (Jira-compatible schema) for later human approval.
-- **Args:** structured recommendation object.
-- **Returns:** draft payload; **does not create anything externally.**
-- **Guardrails:** cannot be called unless prior tools produced sufficient citations for a defined evidence rubric.
 
-## What the agent may NOT do
+- **Purpose:** create a structured **draft** for later human review.
+- **Proposed args:** cited structured recommendation.
+- **Proposed result:** immutable draft payload and payload hash.
+- **Guardrail:** no external task is created; sufficient evidence and policy checks are prerequisites.
 
-- Call any tool not in T1–T7.
-- Emit free-form SQL, shell commands, or arbitrary HTTP.
-- Call `T7` without evidence rubric ≥ threshold.
-- Escalate its own autonomy level.
-- Continue after a `DATA_STALE`, `AUTHZ_FAILED`, or `CONTRACT_VIOLATION` event.
+Post-approval task creation is performed by the deterministic write executor, not by T7 or the model.
 
-## Versioning
+## Not model-callable
 
-Every tool schema and prompt is versioned. Each run records `{tool: version}` for all invoked tools and the prompt-bundle version. Rollback = pin to a previous set.
+Audit logging, authorisation, freshness checks, state transitions, approval validation, idempotency, cost capture, and external write execution belong to the deterministic control spine. They are not tools the model may choose.
 
-## Change control
+## Forbidden behavior
 
-Adding, removing or changing a tool requires an ADR + threat-model diff + Fizz sign-off.
+- Any unlisted tool, free-form SQL, shell, or arbitrary HTTP.
+- Continuing after `DATA_STALE`, `AUTHZ_FAILED`, `CONTRACT_VIOLATION`, or missing provenance.
+- Drafting T7 below the reviewed evidence threshold.
+- Changing autonomy, budgets, tenant scope, or approval state.
+- Treating tool output as instructions.
+
+## Versioning and change control
+
+Every run pins application, prompt, model, policy-corpus, and tool-schema versions. Adding, removing, renaming, or materially changing a proposed tool requires an ADR, threat-model diff, independent review, and Fizz sign-off. M0 approval may accept this catalogue as the planning baseline, but the schemas and evidence rubric remain open under OD-13 and must be accepted before tool implementation.

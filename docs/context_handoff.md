@@ -1,60 +1,59 @@
-# Context Handoff — for the next expert
+# Milestone-0 Context Handoff
 
-> Read this first if you are the specialist Osman brought in to execute the plan.
+> Read this first. This repository contains planning and governance scaffolding only. There is no application implementation, production service, cloud deployment, or implemented v2 architecture.
 
-This repository is a **Milestone 0 scaffold**. No production code has been written yet by design. Your job is to work **through** this scaffold, not around it.
+## Canonical context
 
-## What has been decided (do not re-open without an ADR)
+- `stockoutops-live` is the canonical Phase-2 repository.
+- PharmaRetail AI Control Tower is a read-only Phase-1 reference. Its useful patterns may be selectively migrated later through issue → branch → PR → independent review → merge.
+- The Phase-1 Snowflake account is closed. StockoutOps Live has no Snowflake dependency.
+- AWS is the target cloud, with the preferred simple stack recorded in `05_architecture_v2.md` and `13_risks_and_open_decisions.md`.
 
-- Project name, purpose, and phase (see `README.md`, `docs/00_project_charter.md`).
-- Initial autonomy = **A2 approve-to-act** (see `README.md` §3).
-- Scope in / out (see `docs/03_scope.md`).
-- Rollout gates G0→G4 with exit criteria (see `docs/09_rollout_plan.md`).
-- 7 allow-listed tools with contract-first design (see `docs/06_workflow_and_tool_contracts.md`).
-- STRIDE-based threat model with AI-specific threats (see `docs/07_threat_model.md`).
-- Evaluation methodology: golden cases + historical replay + shadow diff + controlled UAT experiment (see `docs/08_evaluation_plan.md`).
-- Observability signals, SLOs and cost model (see `docs/10_observability_slo_cost.md`).
-- 6 failure-injection scenarios (see `docs/11_failure_injection.md`).
-- Honest labelling rule: never write *production-proven* without real users + sustained operation.
+## Settled project principles
 
-## What is still open (needs your ADRs)
+- A2 approve-to-act.
+- Deterministic control spine and bounded AI reasoning.
+- Human approval before every write action.
+- Allow-listed, schema-validated tools.
+- Durable `run_id` and resumable, auditable state.
+- Citations/provenance, RBAC, tenant isolation, and observability.
+- Failure injection and honest MEASURED / SIMULATED / ASSUMED / TARGET labels.
+- Issue → branch → PR → independent review → merge.
+- Passing tests alone do not complete a milestone.
+- Only Fizz `APPROVE` opens a milestone gate. `APPROVE WITH CONDITIONS` pauses merge until resolution and re-review; `BLOCK` stops the milestone.
 
-- **ADR-0002** LLM provider & model family.
-- **ADR-0003** Workflow engine (adopt vs build).
-- **ADR-0004** Hosting target & region.
-- **ADR-0005** Cost-attribution method.
-- **ADR-0006** Retention policy for LLM prompt/response bodies.
-- **OD-06** UAT consent form.
-- **OD-07** Operator-study primary-metric operational definition.
+## M0 handoff state
 
-See `docs/13_risks_and_open_decisions.md`.
+- The Phase-1 high-level audit is populated in `01_current_state_audit.md`.
+- The gap matrix is populated in `02_gap_matrix.md`.
+- Architecture v2 is rewritten as an AWS-targeted proposal in `05_architecture_v2.md`.
+- The seven proposed v2 tool names are preserved in `06_workflow_and_tool_contracts.md` and are explicitly not described as the exact Phase-1 seven.
+- Snowflake assumptions have been removed from the current target architecture, threat model, environment template, and operating plans.
 
-## Recommended order of work (M0 close-out → M1 kickoff)
+Document presence does not prove M0 approval. The authoritative gate and verdict semantics are in `12_backlog_and_milestones.md`; live evidence is the linked GitHub issue and PR.
 
-1. Read `README.md`, then `docs/00_project_charter.md` → `docs/13_risks_and_open_decisions.md` in order.
-2. Perform the current-state audit against the PharmaRetail codebase and fill in `docs/01_current_state_audit.md`.
-3. Populate `docs/02_gap_matrix.md` from that audit.
-4. Draft the four pending ADRs (0002–0005) and get Honey + Fizz sign-off.
-5. Open one GitHub Issue per M0 line item in `docs/12_backlog_and_milestones.md` (use the `milestone_task` template).
-6. Request the Fizz M0 review PR; capture the verdict.
-7. Only after Osman’s approval, create the `src/` skeleton per the target layout in `src/README.md`.
+## Deferred technical decisions
 
-## Rules you must follow
+- Architecture component boundaries.
+- Workflow-engine approach.
+- PostgreSQL persistence, RLS, approval, idempotency, and outbox design.
+- v2 tool schemas and evidence rubric.
+- UI technology, identity/tenant model, source-data contracts, dbt-core boundary, and external task integration.
 
-- No direct push to `main`. Issue → Branch → PR → independent review → merge.
-- No new external dependency without an ADR.
-- No claim about users, incidents, latency, cost or business impact without a MEASURED / SIMULATED / ASSUMED / TARGET label.
-- Passing tests ≠ milestone completion.
-- Fizz has authority to block a release.
-- Zero RLS leakage is a release-blocker; treat any regression as SEV1.
+M0 approval may accept the planning scaffold without selecting these options. The complete decision list and the implementation point each item gates are in `13_risks_and_open_decisions.md`.
 
-## How to ask for changes to the plan
+## Required close-out sequence
 
-Open a `feature` issue that:
+1. Complete the owner-authorised M0 consolidation issue and PR, including its threat-model diff.
+2. Pass required CI and Markdown checks on the exact PR head.
+3. Obtain independent Fizz `APPROVE` for that exact head. A conditional verdict pauses merge; `BLOCK` stops the milestone.
+4. Squash-merge only after `APPROVE`, then verify the authoritative files on GitHub `main`.
+5. Record Osman’s explicit approval before any Milestone-1 work.
 
-1. States which line of the plan you want to change.
-2. Explains why (evidence, not preference).
-3. References the ADR you’ll create.
-4. Names the required reviewers per `.github/CODEOWNERS` and `docs/team/roles.md`.
+Do not create application code, tests, Docker images, AWS resources, database schemas, or an agent during M0 close-out.
 
-If in doubt, escalate to Osman — do not silently deviate.
+## Authority and history
+
+- Current authority: owner decisions, project charter, accepted ADRs, risks/open decisions, and the reviewed architecture/tool documents.
+- `kickoff_message.md` is a historical transcript and is non-authoritative where later owner decisions supersede it.
+- If documents disagree, stop, open an issue, and resolve the conflict in the authoritative document and any dependent summaries.

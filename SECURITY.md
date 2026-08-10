@@ -23,7 +23,7 @@ In scope:
 
 Out of scope (report to the appropriate vendor):
 
-- Snowflake platform vulnerabilities.
+- AWS managed-service platform vulnerabilities.
 - LLM provider platform vulnerabilities.
 - Third-party libraries (please still notify us).
 
@@ -34,11 +34,11 @@ See `docs/07_threat_model.md`. Any change to the trust boundaries, tool permissi
 ## Handling of secrets
 
 - No secret is ever committed. `.env` is git-ignored; `.env.example` is the only accepted template.
-- CI uses OIDC or short-lived tokens where possible; static secrets live in the platform's secret manager.
+- Runtime secrets are proposed for AWS Secrets Manager; CI should use OIDC or other short-lived tokens.
 - Secret scanning is enabled (see `.github/workflows/security.yml`).
 
 ## Data handling
 
-- All data access must go through governed marts with RLS.
+- All data access must go through reviewed tool/data contracts with server-derived tenant scope and the accepted PostgreSQL/application controls.
 - Zero RLS leakage is a **release-blocking** invariant; any regression is a P0 incident.
 - PII / customer-identifying fields are not surfaced to the agent unless explicitly whitelisted by a data contract.

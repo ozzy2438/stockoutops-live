@@ -2,7 +2,11 @@
 
 **Human-Supervised AI Decisioning & Reliability Platform**
 
-Phase 2 of the existing **PharmaRetail AI Control Tower**. We are not starting another broad portfolio demo. We are converting an existing governed Snowflake/dbt stockout-investigation system into an **operated, observable, human-supervised product** with credible user, incident, reliability and cost evidence.
+> **Current implementation status: planning-only scaffold.** No application code, agent, database, AWS resource, or production service exists. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
+
+StockoutOps Live is the new canonical Phase-2 implementation. The [PharmaRetail AI Control Tower](https://github.com/ozzy2438/PharmaRetail-AI-Control-Tower) is reference material only; useful patterns may be selectively migrated after review, but the old project is not a runtime dependency or a codebase to copy wholesale.
+
+AWS is the target cloud. The preferred simple stack is Python, PostgreSQL/Amazon RDS, S3 where needed, dbt-core where justified, FastAPI, a lightweight human-review UI, Docker, ECS Fargate, CloudWatch, Secrets Manager, and GitHub Actions. Architecture v2, workflow engine, persistence design, and tool contracts are Milestone-0 proposals. Accepting the planning scaffold does not select unresolved technical options; accepted ADRs govern implementation.
 
 ---
 
@@ -10,9 +14,9 @@ Phase 2 of the existing **PharmaRetail AI Control Tower**. We are not starting a
 
 Retail operations teams receiving a stockout or low-stock alert today manually assemble evidence from many places: current stock, recent sales & demand, open orders, supplier lead time, promotion/campaign impact, store & SKU comparisons, relevant SOP or operations policy, and prior similar incidents. This is slow, inconsistent between analysts, and the evidentiary basis of the final decision is often not traceable after the fact.
 
-## 2. What StockoutOps Live Does
+## 2. Intended Workflow
 
-When a stockout alert or investigation request is received, the platform:
+Once implemented and admitted through the rollout gates, a stockout alert or investigation request will follow this workflow:
 
 1. Validates identity, tenant, eligibility and data freshness.
 2. Persists a workflow record with a durable `run_id`.
@@ -26,7 +30,7 @@ When a stockout alert or investigation request is received, the platform:
 
 ## 3. Initial Autonomy — A2 (approve-to-act)
 
-**Agent may automatically:** read governed data marts; fetch supplier and promotion data; retrieve SOP/policy evidence; check freshness and DQ; find similar incidents; propose root cause and affected scope; prepare a recovery recommendation; draft a Jira/incident/task.
+**Once implemented, the bounded agent may:** read governed data; fetch supplier and promotion evidence; retrieve SOP/policy evidence; check freshness and data quality; find similar incidents; propose root cause and affected scope; prepare a recovery recommendation; draft an incident/task.
 
 **After human approval only:** create the approved incident/task; send notification to the assigned owner; record investigation outcome.
 
@@ -65,7 +69,7 @@ When a stockout alert or investigation request is received, the platform:
 
 The project is done **only** when all of the following are true:
 
-- Real cloud deployment with auth and RBAC.
+- Real AWS deployment with auth and RBAC.
 - ≥ 3 external UAT users.
 - 8–12 weeks of continuous operation.
 - Scheduled runs and a release history.
@@ -83,13 +87,14 @@ The project is done **only** when all of the following are true:
 - User acceptance / edit / reject evidence.
 - Traceable Issue → Branch → PR → independent review → Release history.
 - Architecture, tool contracts, threat model, runbooks, system card.
-- Independent final assurance by **Fizz**.
+- Independent final **APPROVE** verdict by **Fizz**.
 - Honest live-status label.
 
 ### Honest labelling
 
-- Default state: **Production-grade Stockout Investigation Platform validated through controlled UAT and failure-injection testing.**
-- If real retail operators use it under a bounded process: **Human-supervised production pilot.**
+- Current state: **Milestone-0 planning scaffold — no application or live deployment.**
+- Only after controlled UAT and failure-injection evidence: **Production-grade Stockout Investigation Platform validated through controlled UAT and failure-injection testing.**
+- If real retail operators later use it under a bounded process: **Human-supervised production pilot.**
 - **Never** use the phrase *production-proven* without real users and sustained operation.
 
 ## 7. Team (Buzz)
@@ -104,9 +109,11 @@ The project is done **only** when all of the following are true:
 
 Fizz does **not** report into the implementation team.
 
+Only `APPROVE` opens a milestone gate. `APPROVE WITH CONDITIONS` pauses merge and progression until the conditions are resolved and Fizz approves the new head; `BLOCK` stops the milestone.
+
 ## 8. Repository Map
 
-```
+```text
 .
 ├── docs/                       # All governance & design docs
 │   ├── 00_project_charter.md
@@ -135,8 +142,8 @@ Fizz does **not** report into the implementation team.
 │   └── uat/                    # G2 operator study
 ├── observability/              # Dashboards, alert rules, SLO defs
 ├── infra/                      # IaC, deployment, secrets scaffolding
-├── src/                        # (empty until Milestone 0 approved)
-├── tests/                      # (empty until Milestone 0 approved)
+├── src/                        # Documentation-only until Milestone 0 is approved
+├── tests/                      # Documentation-only until Milestone 0 is approved
 ├── milestones/                 # Per-milestone deliverable folders
 └── .github/                    # Templates, workflows, CODEOWNERS
 ```
@@ -156,4 +163,4 @@ Fizz does **not** report into the implementation team.
 
 ---
 
-_Last updated: repo bootstrap. Owner: Osman Orka. Independent assurance: Fizz._
+*Last updated: 2026-08-10 Milestone-0 handoff consistency pass. Owner: Osman Orka. Independent assurance: Fizz.*

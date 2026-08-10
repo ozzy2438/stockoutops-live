@@ -15,10 +15,12 @@ Use Nygard-style ADRs stored under `docs/decisions/`. Numbered sequentially. Eve
 ## Consequences
 
 ### Positive
+
 - Explicit, reviewable, versioned decision history.
 - New contributors can trace *why*, not just *what*.
 
 ### Negative / trade-offs
+
 - Adds friction to trivial decisions if applied too broadly. Mitigation: use ADRs only for the classes listed in `docs/decisions/README.md`.
 
 ## Alternatives considered
