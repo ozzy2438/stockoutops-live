@@ -161,4 +161,4 @@ Fizz does **not** report into the implementation team.
 
 ---
 
-_Last updated: 2026-08-10 Milestone-0 handoff consistency pass. Owner: Osman Orka. Independent assurance: Fizz._
+*Last updated: 2026-08-10 Milestone-0 handoff consistency pass. Owner: Osman Orka. Independent assurance: Fizz.*

@@ -15,6 +15,7 @@
 **Initial autonomy:** A2 — approve-to-act.
 
 **Allowed initial outcomes:**
+
 - read and analyse governed data
 - prepare investigation pack
 - recommend recovery action
@@ -22,6 +23,7 @@
 - create an approved low-risk task after human approval
 
 **Forbidden:**
+
 - automatic purchase-order changes
 - automatic inventory transfers
 - pricing or promotion changes
@@ -31,6 +33,7 @@
 - direct unrestricted database writes
 
 **Team ownership:**
+
 - Orchestrator: scope, milestone plan, backlog, dependencies and gates
 - Honey: architecture, contracts, durable state, RBAC, threat model and SLOs
 - Bumble: implementation, deployment, CI/CD, observability and recovery
@@ -38,6 +41,7 @@
 - Fizz: independent assurance and release verdict
 
 **Operating rules:**
+
 - Keep scope tightly constrained.
 - Do not add technologies without a written reason.
 - Work through issue → branch → PR → independent review → merge → release.
@@ -49,6 +53,7 @@
 - High-impact decisions must be escalated to Osman.
 
 **Milestone 0:** *Do not implement production code yet.* Produce:
+
 1. Current-state repository and evidence audit.
 2. Gap-to-deliverable matrix.
 3. Exact in-scope and out-of-scope definition.

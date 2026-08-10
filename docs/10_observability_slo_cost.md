@@ -5,12 +5,15 @@
 ## Signals
 
 ### Structured logs
+
 Every log line includes: `timestamp`, `run_id`, `tenant_id`, `actor`, `step`, `level`, `message`, `latency_ms`, `outcome`.
 
 ### Traces
+
 A single trace is proposed to span UI click → workflow step → tool call → LLM call → write. Trace id is recorded in the audit event and shown in the UI as “Run trace”. OpenTelemetry-compatible instrumentation should export to CloudWatch; the exact tracing configuration is reviewed before implementation.
 
 ### Metrics
+
 - `investigation_started_total{tenant}`
 - `investigation_completed_total{tenant,outcome}` (outcome ∈ approved/edited/rejected/escalated/failed)
 - `investigation_latency_seconds` (histogram; p50/p95)
@@ -24,6 +27,7 @@ A single trace is proposed to span UI click → workflow step → tool call → 
 - `feature_flag_state{flag}`
 
 ### Audit
+
 Append-only log with per-tenant partitioning; integrity-hashed periodically.
 
 ## SLOs (initial, subject to M1 measurement)

@@ -2,7 +2,7 @@
 
 > No test code exists in Milestone 0. Proposed layout for M1+:
 >
-> ```
+> ```text
 > tests/
 > ├── unit/              # per-module unit tests
 > ├── contract/          # tool JSON-schema contract tests

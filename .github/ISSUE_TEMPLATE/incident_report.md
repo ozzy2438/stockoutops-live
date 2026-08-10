@@ -19,16 +19,16 @@ labels: ["incident", "P?"]
 ## Detection
 
 - How was it detected? (alert / user / manual)
-- Time to detect: 
-- Time to mitigate: 
-- Time to resolve: 
+- Time to detect:
+- Time to mitigate:
+- Time to resolve:
 
 ## Impact
 
-- Users affected: 
-- Runs affected (run_ids): 
-- Data at risk: 
-- Financial / operational cost: 
+- Users affected:
+- Runs affected (run_ids):
+- Data at risk:
+- Financial / operational cost:
 
 ## Timeline
 
@@ -42,9 +42,9 @@ labels: ["incident", "P?"]
 
 ## Corrective actions
 
-- Immediate: 
-- Short-term (this sprint): 
-- Long-term / structural: 
+- Immediate:
+- Short-term (this sprint):
+- Long-term / structural:
 
 ## Post-mortem link
 

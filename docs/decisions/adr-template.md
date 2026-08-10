@@ -17,12 +17,15 @@
 ## Consequences
 
 ### Positive
+
 - _TBD_
 
 ### Negative / trade-offs
+
 - _TBD_
 
 ### Neutral
+
 - _TBD_
 
 ## Alternatives considered

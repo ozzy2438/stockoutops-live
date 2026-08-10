@@ -20,9 +20,9 @@ labels: ["milestone"]
 
 ## Acceptance criteria
 
-- [ ] 
-- [ ] 
-- [ ] 
+- [ ]
+- [ ]
+- [ ]
 
 ## Dependencies
 
@@ -31,8 +31,8 @@ labels: ["milestone"]
 
 ## Owner & reviewer
 
-- Owner (Buzz role): 
-- Independent reviewer: 
+- Owner (Buzz role):
+- Independent reviewer:
 - Fizz review required? `yes` / `no`
 
 ## Definition of Done reference

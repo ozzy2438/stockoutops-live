@@ -15,8 +15,8 @@ labels: ["feature", "needs-adr?"]
 
 ## Scope
 
-- In scope: 
-- Out of scope: 
+- In scope:
+- Out of scope:
 
 ## Autonomy impact
 
@@ -25,8 +25,8 @@ labels: ["feature", "needs-adr?"]
 
 ## Risk
 
-- Trust boundary crossed? 
-- New external dependency? 
+- Trust boundary crossed?
+- New external dependency?
 - Threat-model diff required? `yes` / `no`
 - ADR required? `yes` / `no`
 
