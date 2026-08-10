@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+.pnpm-store/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# dbt
+dbt_packages/
+target/
+logs/
+
+# Snowflake / local data
+*.duckdb
+*.sqlite
+*.parquet
+data/local/
+
+# Terraform / IaC
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+
+# OS / misc
+Thumbs.db
