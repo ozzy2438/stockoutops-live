@@ -21,8 +21,12 @@ def seed_fixtures(dsn: str, fixtures_dir: Path) -> str:
     inventory = _rows(fixtures_dir / "inventory.csv")
     demand = _rows(fixtures_dir / "demand.csv")
     supplier = _rows(fixtures_dir / "supplier.csv")
-    with psycopg.connect(dsn) as connection, connection.transaction():
-        connection.executemany(
+    with (
+        psycopg.connect(dsn) as connection,
+        connection.transaction(),
+        connection.cursor() as cursor,
+    ):
+        cursor.executemany(
             """
             INSERT INTO inventory_fixture (
                 tenant_id, sku_id, store_id, on_hand, reserved, on_order, updated_at
@@ -38,7 +42,7 @@ def seed_fixtures(dsn: str, fixtures_dir: Path) -> str:
             """,
             inventory,
         )
-        connection.executemany(
+        cursor.executemany(
             """
             INSERT INTO demand_fixture (
                 tenant_id, sku_id, store_id, window_start, window_end,
@@ -57,7 +61,7 @@ def seed_fixtures(dsn: str, fixtures_dir: Path) -> str:
             """,
             demand,
         )
-        connection.executemany(
+        cursor.executemany(
             """
             INSERT INTO supplier_fixture (
                 tenant_id, sku_id, supplier_id, open_order_quantity,
