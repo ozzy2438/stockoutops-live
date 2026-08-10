@@ -1,6 +1,6 @@
 # 07 — Security, Privacy & Threat Model
 
-> Owner: Honey. Reviewer: Fizz. Status: **proposal; not implemented or accepted**. Method: STRIDE per trust boundary, plus AI-specific threat classes.
+> Owner: Honey. Reviewer: Fizz. Status: **proposed Milestone-0 planning baseline; not implemented**. Unresolved technical controls remain gated by `13_risks_and_open_decisions.md`. Method: STRIDE per trust boundary, plus AI-specific threat classes.
 
 ## Trust boundaries
 

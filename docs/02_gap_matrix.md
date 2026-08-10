@@ -1,6 +1,6 @@
 # 02 — Gap-to-Deliverable Matrix
 
-> Status: **populated for the Milestone-0 handoff** from the high-level Phase-1 audit. Acceptance and milestone closure remain pending independent review.
+> Status: **populated for the Milestone-0 handoff** from the high-level Phase-1 audit. Live gate state and evidence are authoritative in `12_backlog_and_milestones.md` and [GitHub PR #6](https://github.com/ozzy2438/stockoutops-live/pull/6); this matrix does not encode temporal gate status.
 
 ## Legend
 
