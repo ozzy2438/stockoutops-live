@@ -55,7 +55,7 @@ Issue and PR state are the live gate record; this static file does not duplicate
 2. Resolve simulated identity, tenant, and role server-side; fail closed on invalid or cross-tenant access.
 3. Retrieve only T1 inventory, T2 sales/demand, and T3 supplier evidence from governed versioned fixtures.
 4. Validate 3/3 evidence freshness, contract, provenance, and citation IDs before reasoning.
-5. Invoke the OpenAI Responses API at most once per normal run, using exact snapshot `gpt-5-nano-2025-08-07`, no tools, and strict structured output for only a cited root-cause hypothesis and recommendation draft. CI uses a deterministic stub only.
+5. Invoke the OpenAI Responses API at most once per normal run, using exact snapshot `gpt-4.1-mini-2025-04-14`, no tools, and strict structured output for only a cited root-cause hypothesis and recommendation draft. CI uses a deterministic stub only.
 6. Present cited findings through the minimal review surface and persist Approve / Edit / Reject / Escalate.
 7. Append every accepted transition and rejected control attempt to the audit trail.
 8. Resume safely after restart and retry without duplicate internal actions.
@@ -66,7 +66,7 @@ The ADRs accept only the following local M1 subsets. `docs/13` remains the sourc
 
 | Open decision | Accepted M1 subset | Scope that remains open after this PR |
 |---|---|---|
-| OD-01 | ADR-0002: OpenAI Responses API, exact `gpt-5-nano-2025-08-07` snapshot, strict output, no tools | Provider fallback, replacement-model choice, production provider strategy |
+| OD-01 | ADR-0002: OpenAI Responses API, exact `gpt-4.1-mini-2025-04-14` snapshot, strict output, no tools | Provider fallback, replacement-model choice, production provider strategy |
 | OD-02 | ADR-0003: explicit Python state machine for one local single-writer slice | Distributed workflow engine, scheduling, leasing, and multi-writer recovery |
 | OD-03 | ADR-0004: local PostgreSQL 16 state, audit, idempotency, and provenance subset | RLS, outbox, backup/PITR, restore drill, production schema and recovery |
 | OD-05 | ADR-0005: local server-derived simulated identity and tenant fixtures | Real IdP, sessions, MFA, RBAC, provisioning, and production tenant model |

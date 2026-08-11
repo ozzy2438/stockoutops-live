@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "stockoutops-live"
+version = "0.1.0"
+description = "M1 local simulated human-supervised stockout vertical slice"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+  "fastapi>=0.116,<1",
+  "httpx>=0.28,<1",
+  "jinja2>=3.1,<4",
+  "openai>=1.99,<3",
+  "psycopg[binary]>=3.2,<4",
+  "pydantic>=2.11,<3",
+  "uvicorn>=0.35,<1",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.4,<10",
+  "pytest-cov>=6.2,<8",
+  "ruff>=0.12,<1",
+]
+
+[project.scripts]
+stockoutops-migrate = "stockoutops.database:main"
+stockoutops-seed = "stockoutops.evidence.seed:main"
+stockoutops-smoke = "stockoutops.smoke:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/stockoutops"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+markers = [
+  "integration: requires a real PostgreSQL 16 database",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]

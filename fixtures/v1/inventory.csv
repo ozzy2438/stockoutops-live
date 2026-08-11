@@ -1,0 +1,3 @@
+tenant_id,sku_id,store_id,on_hand,reserved,on_order,updated_at
+t_alpha,SKU-001,STORE-001,2,1,0,2026-08-10T08:00:00Z
+t_beta,SKU-001,STORE-001,25,2,20,2026-08-10T07:30:00Z

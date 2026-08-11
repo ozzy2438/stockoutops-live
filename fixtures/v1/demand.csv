@@ -1,0 +1,3 @@
+tenant_id,sku_id,store_id,window_start,window_end,units_sold,average_daily_units,demand_signal,updated_at
+t_alpha,SKU-001,STORE-001,2026-08-03T12:00:00Z,2026-08-10T12:00:00Z,56,8,above_available_stock,2026-08-09T12:00:00Z
+t_beta,SKU-001,STORE-001,2026-08-03T12:00:00Z,2026-08-10T12:00:00Z,14,2,stable,2026-08-09T12:00:00Z
