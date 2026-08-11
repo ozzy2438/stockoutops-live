@@ -19,7 +19,9 @@ from stockoutops.reasoning.schemas import (
     validate_citations,
 )
 
-MODEL_ID = "gpt-5-nano-2025-08-07"
+MODEL_ID = "gpt-4.1-mini-2025-04-14"
+INPUT_COST_PER_MILLION_USD = 0.40
+OUTPUT_COST_PER_MILLION_USD = 1.60
 MAX_OUTPUT_TOKENS = 1500
 MAX_INPUT_TOKENS = 12_000
 MAX_INPUT_BYTES = MAX_INPUT_TOKENS * 4
@@ -122,7 +124,10 @@ class OpenAIResponsesAdapter:
         output_tokens = getattr(usage, "output_tokens", None)
         estimated_cost = None
         if isinstance(input_tokens, int) and isinstance(output_tokens, int):
-            estimated_cost = (input_tokens * 0.05 + output_tokens * 0.40) / 1_000_000
+            estimated_cost = (
+                input_tokens * INPUT_COST_PER_MILLION_USD
+                + output_tokens * OUTPUT_COST_PER_MILLION_USD
+            ) / 1_000_000
         return ReasoningOutcome(
             result=result,
             model_id=MODEL_ID,

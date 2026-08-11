@@ -5,8 +5,10 @@ import pytest
 
 from stockoutops.reasoning.deterministic_stub import DeterministicStubAdapter
 from stockoutops.reasoning.openai_adapter import (
+    INPUT_COST_PER_MILLION_USD,
     MAX_OUTPUT_TOKENS,
     MODEL_ID,
+    OUTPUT_COST_PER_MILLION_USD,
     TIMEOUT_SECONDS,
     OpenAIResponsesAdapter,
 )
@@ -52,7 +54,7 @@ def test_openai_adapter_constructs_exact_bounded_request_without_network() -> No
     adapter = OpenAIResponsesAdapter(SimpleNamespace(responses=responses))
     outcome = adapter.reason(_bundle())
     request = responses.request
-    assert request["model"] == MODEL_ID == "gpt-5-nano-2025-08-07"
+    assert request["model"] == MODEL_ID == "gpt-4.1-mini-2025-04-14"
     assert request["store"] is False
     assert request["background"] is False
     assert request["stream"] is False
@@ -74,4 +76,8 @@ def test_openai_adapter_constructs_exact_bounded_request_without_network() -> No
         is False
     )
     assert outcome.model_id == MODEL_ID
+    assert (
+        outcome.estimated_cost_usd
+        == (100 * INPUT_COST_PER_MILLION_USD + 40 * OUTPUT_COST_PER_MILLION_USD) / 1_000_000
+    )
     assert responses.calls == 1
