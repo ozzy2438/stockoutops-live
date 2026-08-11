@@ -6,6 +6,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from stockoutops.database import Database
 from stockoutops.evidence.provenance import canonical_hash
@@ -321,6 +322,58 @@ def test_audit_replay_reconstructs_current_state(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["current_state"] == response.json()["replayed_state"]
     assert response.json()["current_state"] == "awaiting_human"
+
+
+@pytest.mark.integration
+def test_audit_replay_ignores_stale_trailing_rejection_event(client: TestClient) -> None:
+    """Deterministic regression for the post-merge main CI failure
+    (current_state=awaiting_human, replayed_state=drafting_recommendation).
+
+    Independently reproduced root cause: a control_rejected/intake_rejected/
+    review_rejected event always has from_state == to_state (it never
+    transitions anything - to_state is just a snapshot of whatever the run's
+    state happened to be when that rejection's own read ran). Under real
+    concurrency, one loser's rejection INSERT can commit - and so receive a
+    later event_id - after a genuine later transition's INSERT already
+    committed, even though the rejection's own state snapshot was read
+    earlier. Audit replay treated the last event with any non-null to_state
+    as authoritative, so that stale snapshot silently overwrote the correct
+    final state.
+
+    This test fabricates that exact pathological ordering directly (no
+    threads, no timing dependence, no flakiness) so it deterministically
+    exercises the fix every run: it appends a control_rejected event whose
+    to_state is an earlier state than the run's true final state, as the
+    last event by event_id, and asserts audit replay is not fooled by it.
+    """
+    run = create_run(client, key="audit-replay-stale-rejection")
+    with psycopg.connect(ADMIN_DSN) as connection, connection.transaction():
+        connection.execute(
+            """
+            INSERT INTO workflow_event (
+                run_id, tenant_id, event_type, from_state, to_state,
+                actor_id, payload, occurred_at
+            ) VALUES (%s, %s, 'control_rejected', %s, %s, %s, %s, now())
+            """,
+            (
+                run["run_id"],
+                run["tenant_id"],
+                "drafting_recommendation",
+                "drafting_recommendation",
+                "operator-alpha",
+                Jsonb({"code": "STATE_VERSION_CONFLICT"}),
+            ),
+        )
+    response = client.get(
+        f"/v1/investigations/{run['run_id']}/audit",
+        headers=auth("operator_alpha"),
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["current_state"] == "awaiting_human"
+    assert body["replayed_state"] == "awaiting_human", body
+    assert body["events"][-1]["event_type"] == "control_rejected"
+    assert body["events"][-1]["to_state"] == "drafting_recommendation"
 
 
 @pytest.mark.integration

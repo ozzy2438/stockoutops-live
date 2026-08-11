@@ -431,7 +431,18 @@ class InvestigationService:
         events = self.repository.audit(principal, run_id)
         replayed = None
         for event in events:
-            if event["to_state"] is not None:
+            # control_rejected/intake_rejected/review_rejected are recorded
+            # with to_state set to whatever the run's state happened to be
+            # at that rejection's own read (from_state == to_state: no
+            # transition occurred). Under concurrency, a rejection's INSERT
+            # can commit — and so get a later event_id — after a genuine
+            # later transition's INSERT, even though its own state snapshot
+            # was taken earlier. Treating every non-null to_state as the
+            # latest replayed state therefore lets a stale rejection
+            # overwrite the correct final state. Only a genuine transition
+            # (to_state present and different from from_state) may update
+            # the replayed state.
+            if event["to_state"] is not None and event["to_state"] != event["from_state"]:
                 replayed = event["to_state"]
         current = self.repository.get_run(principal, run_id)
         return {
