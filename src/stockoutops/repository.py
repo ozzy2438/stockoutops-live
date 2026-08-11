@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+import psycopg
+from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from stockoutops.database import Database
@@ -70,6 +73,45 @@ def _run(row: dict[str, Any]) -> RunRecord:
 
 class _IdempotencyRaceLost(Exception):
     """Internal control-flow signal: another transaction committed this key first."""
+
+
+def _tool_lock_key(run_id: UUID, tool_name: str) -> int:
+    digest = hashlib.sha256(f"{run_id}:{tool_name}".encode()).digest()
+    return int.from_bytes(digest[:8], "big", signed=True)
+
+
+class ToolClaim:
+    """Holds a session-level Postgres advisory lock across an external tool
+    call on a dedicated connection.
+
+    Session-scoped (not transaction-scoped): the lock is independent of any
+    commit/rollback and is held for exactly as long as this connection
+    stays open, however long the real call takes. Postgres releases it
+    automatically if the connection dies (crash), so a genuinely abandoned
+    attempt does not block observers forever — it just leaves the row
+    'started', which is treated as a permanent stop pending manual
+    recovery, not an automatic retry.
+    """
+
+    def __init__(self, connection: psycopg.Connection[dict[str, Any]], lock_key: int) -> None:
+        self._connection = connection
+        self._lock_key = lock_key
+        self._released = False
+
+    def release(self) -> None:
+        if self._released:
+            return
+        self._released = True
+        try:
+            self._connection.execute("SELECT pg_advisory_unlock(%s)", (self._lock_key,))
+        finally:
+            self._connection.close()
+
+    def __enter__(self) -> ToolClaim:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.release()
 
 
 class Repository:
@@ -402,7 +444,7 @@ class Repository:
             raise ConflictError("STATE_VERSION_CONFLICT", "Run state changed concurrently")
         return _run(updated)
 
-    def record_tool_start(
+    def claim_or_observe_tool(
         self,
         principal: Principal,
         run_id: UUID,
@@ -410,20 +452,49 @@ class Repository:
         tool_name: str,
         request_hash: str,
         now: datetime,
-    ) -> bool:
-        with self.database.connect() as connection, connection.transaction():
-            row = connection.execute(
-                """
-                INSERT INTO tool_invocation (
-                    run_id, tenant_id, tool_name, tool_schema_version,
-                    request_hash, status, created_at
-                ) VALUES (%s, %s, %s, 'v1', %s, 'started', %s)
-                ON CONFLICT (run_id, tool_name) DO NOTHING
-                RETURNING invocation_id
-                """,
-                (run_id, principal.tenant_id, tool_name, request_hash, now),
-            ).fetchone()
-        return row is not None
+    ) -> tuple[dict[str, Any], ToolClaim | None]:
+        """Serialize every caller for this (run_id, tool_name) on a single
+        Postgres session advisory lock instead of a fixed poll/timeout.
+
+        A duplicate caller blocks for exactly as long as the true owner's
+        call takes — matching the accepted up-to-30s reasoning bound with
+        no hard-coded "should be fast" assumption — rather than racing a
+        timer against it. Returns `(row, None)` if another attempt already
+        exists: completed, genuinely failed, or abandoned (the lock is free
+        again because that session ended without finishing, so the row is
+        still 'started' — callers must treat this as a permanent stop, not
+        retry it, preserving manual recovery/replay as the only way past a
+        crashed attempt). Returns `(row, claim)` if this call is the
+        exclusive owner: it must do the work, call `complete_tool`, then
+        release the claim (release also happens automatically if the
+        connection is dropped, e.g. on crash).
+        """
+        connection = psycopg.connect(self.database.dsn, row_factory=dict_row, autocommit=True)
+        lock_key = _tool_lock_key(run_id, tool_name)
+        connection.execute("SELECT pg_advisory_lock(%s)", (lock_key,))
+        existing = connection.execute(
+            """
+            SELECT *
+            FROM tool_invocation
+            WHERE run_id = %s AND tenant_id = %s AND tool_name = %s
+            """,
+            (run_id, principal.tenant_id, tool_name),
+        ).fetchone()
+        if existing is not None:
+            connection.execute("SELECT pg_advisory_unlock(%s)", (lock_key,))
+            connection.close()
+            return existing, None
+        row = connection.execute(
+            """
+            INSERT INTO tool_invocation (
+                run_id, tenant_id, tool_name, tool_schema_version,
+                request_hash, status, created_at
+            ) VALUES (%s, %s, %s, 'v1', %s, 'started', %s)
+            RETURNING *
+            """,
+            (run_id, principal.tenant_id, tool_name, request_hash, now),
+        ).fetchone()
+        return row, ToolClaim(connection, lock_key)
 
     def complete_tool(
         self,

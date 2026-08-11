@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
@@ -33,15 +32,6 @@ from stockoutops.state_machine import RunState
 
 Clock = Callable[[], datetime]
 REVIEW_POLICY = timedelta(hours=24)
-
-# Bound how long a concurrent idempotent-replay caller waits for a peer's
-# in-flight tool_invocation (started by the same run_id+tool_name) to reach a
-# terminal status, before treating it as stuck. Deliberately short: the M1
-# tools are local fixture reads / a deterministic stub, so a genuine peer
-# finishes in low milliseconds; this only smooths the race window between one
-# caller's INSERT commit and its own completion write.
-_CONCURRENT_TOOL_WAIT_ATTEMPTS = 50
-_CONCURRENT_TOOL_WAIT_INTERVAL_S = 0.02
 
 
 def utc_now() -> datetime:
@@ -183,27 +173,18 @@ class InvestigationService:
             else:
                 return run
 
-    def _await_tool(
-        self, principal: Principal, run_id: UUID, tool_name: str
-    ) -> dict[str, object] | None:
-        """Poll a tool_invocation row until it leaves 'started', bounded.
-
-        Only used when this caller lost the record_tool_start race to a
-        concurrent duplicate of the same idempotent request. It never
-        initiates or retries work itself; it just waits for the one true
-        in-flight attempt to reach a terminal status.
-        """
-        row = self.repository.get_tool(principal, run_id, tool_name)
-        attempts = 0
-        while (
-            row is not None
-            and row["status"] == "started"
-            and attempts < _CONCURRENT_TOOL_WAIT_ATTEMPTS
-        ):
-            time.sleep(_CONCURRENT_TOOL_WAIT_INTERVAL_S)
-            row = self.repository.get_tool(principal, run_id, tool_name)
-            attempts += 1
-        return row
+    @staticmethod
+    def _forbidden_retry_code(existing: dict[str, object], default: str) -> str:
+        """Read back the true originating failure code from an already-
+        failed tool_invocation, instead of a generic *_RETRY_FORBIDDEN, so a
+        duplicate caller's escalation reflects what actually went wrong
+        rather than misreporting it as a retry-policy rejection. Falls back
+        to `default` for a row that never reached 'failed' (e.g. an
+        abandoned 'started' row from a crashed attempt)."""
+        if existing["status"] == "failed":
+            metadata = existing.get("metadata_json") or {}
+            return metadata.get("error_code", default)
+        return default
 
     def _gather_evidence(self, principal: Principal, run: RunRecord) -> list[Evidence]:
         specs = (
@@ -256,63 +237,45 @@ class InvestigationService:
         )
         evidence: list[Evidence] = []
         for tool_name, query, invoke in specs:
-            existing = self.repository.get_tool(principal, run.run_id, tool_name)
-            if existing and existing["status"] == "started":
-                # A concurrent duplicate of this same request may still be
-                # mid-flight on this exact tool; wait for it to finish
-                # instead of treating it as a forbidden retry.
-                existing = self._await_tool(principal, run.run_id, tool_name)
-            if existing:
-                if existing["status"] != "completed" or existing["result_json"] is None:
-                    raise EvidenceFailure(
-                        "EVIDENCE_RETRY_FORBIDDEN",
-                        f"{tool_name} was already attempted and will not be retried",
-                    )
-                evidence.append(parse_evidence(existing["result_json"]))
-                continue
-            started = self.repository.record_tool_start(
+            existing, claim = self.repository.claim_or_observe_tool(
                 principal,
                 run.run_id,
                 tool_name=tool_name,
                 request_hash=canonical_hash(query),
                 now=self.clock(),
             )
-            if not started:
-                resolved = self._await_tool(principal, run.run_id, tool_name)
-                if (
-                    resolved is not None
-                    and resolved["status"] == "completed"
-                    and resolved["result_json"] is not None
-                ):
-                    evidence.append(parse_evidence(resolved["result_json"]))
+            if claim is None:
+                if existing["status"] == "completed" and existing["result_json"] is not None:
+                    evidence.append(parse_evidence(existing["result_json"]))
                     continue
                 raise EvidenceFailure(
-                    "EVIDENCE_RETRY_FORBIDDEN",
-                    f"{tool_name} invocation already exists",
+                    self._forbidden_retry_code(existing, "EVIDENCE_RETRY_FORBIDDEN"),
+                    f"{tool_name} was already attempted and will not be retried",
                 )
-            try:
-                item = invoke()
-            except EvidenceFailure as exc:
+            with claim:
+                try:
+                    item = invoke()
+                except EvidenceFailure as exc:
+                    self.repository.complete_tool(
+                        principal,
+                        run.run_id,
+                        tool_name=tool_name,
+                        result=None,
+                        metadata={"error_code": exc.code},
+                        status="failed",
+                        now=self.clock(),
+                    )
+                    raise
                 self.repository.complete_tool(
                     principal,
                     run.run_id,
                     tool_name=tool_name,
-                    result=None,
-                    metadata={"error_code": exc.code},
-                    status="failed",
+                    result=item.model_dump(mode="json"),
+                    metadata={"evidence_id": item.evidence_id},
+                    status="completed",
                     now=self.clock(),
                 )
-                raise
-            self.repository.complete_tool(
-                principal,
-                run.run_id,
-                tool_name=tool_name,
-                result=item.model_dump(mode="json"),
-                metadata={"evidence_id": item.evidence_id},
-                status="completed",
-                now=self.clock(),
-            )
-            evidence.append(item)
+                evidence.append(item)
         return evidence
 
     def _reason_outcome_from_row(self, row: dict[str, object]) -> ReasoningOutcome:
@@ -331,74 +294,60 @@ class InvestigationService:
         )
 
     def _reason_once(self, principal: Principal, run: RunRecord) -> ReasoningOutcome:
-        existing = self.repository.get_tool(principal, run.run_id, "reasoning")
-        if existing and existing["status"] == "started":
-            # A concurrent duplicate of this same request may still be
-            # mid-flight on reasoning; wait for it instead of forbidding.
-            existing = self._await_tool(principal, run.run_id, "reasoning")
-        if existing:
-            if existing["status"] == "completed" and existing["result_json"]:
-                return self._reason_outcome_from_row(existing)
-            raise ReasoningFailure(
-                "REASONING_RETRY_FORBIDDEN",
-                "A reasoning invocation already exists and automatic retry is forbidden",
-            )
         evidence = self.repository.list_evidence(principal, run.run_id)
         request_hash = canonical_hash([item.model_dump(mode="json") for item in evidence])
-        if not self.repository.record_tool_start(
+        existing, claim = self.repository.claim_or_observe_tool(
             principal,
             run.run_id,
             tool_name="reasoning",
             request_hash=request_hash,
             now=self.clock(),
-        ):
-            resolved = self._await_tool(principal, run.run_id, "reasoning")
-            if (
-                resolved is not None
-                and resolved["status"] == "completed"
-                and resolved["result_json"]
-            ):
-                return self._reason_outcome_from_row(resolved)
+        )
+        if claim is None:
+            if existing["status"] == "completed" and existing["result_json"]:
+                return self._reason_outcome_from_row(existing)
             raise ReasoningFailure(
-                "REASONING_RETRY_FORBIDDEN", "Reasoning invocation already exists"
+                self._forbidden_retry_code(existing, "REASONING_RETRY_FORBIDDEN"),
+                "A reasoning invocation already exists and will not be retried",
             )
-        try:
-            outcome = self.reasoning.reason(evidence)
-            validate_citations(outcome.result, {item.evidence_id for item in evidence})
-        except (ReasoningFailure, ValueError) as exc:
-            code = getattr(exc, "code", "INVALID_REASONING_OUTPUT")
+        with claim:
+            try:
+                outcome = self.reasoning.reason(evidence)
+                validate_citations(outcome.result, {item.evidence_id for item in evidence})
+            except (ReasoningFailure, ValueError) as exc:
+                code = getattr(exc, "code", "INVALID_REASONING_OUTPUT")
+                self.repository.complete_tool(
+                    principal,
+                    run.run_id,
+                    tool_name="reasoning",
+                    result=None,
+                    metadata={"error_code": code},
+                    status="failed",
+                    now=self.clock(),
+                )
+                if isinstance(exc, ReasoningFailure):
+                    raise
+                raise ReasoningFailure(code, "Reasoning citation validation failed") from exc
+            metadata = {
+                "model_id": outcome.model_id,
+                "prompt_hash": outcome.prompt_hash,
+                "input_hash": outcome.input_hash,
+                "output_hash": outcome.output_hash,
+                "input_tokens": outcome.input_tokens,
+                "output_tokens": outcome.output_tokens,
+                "latency_ms": outcome.latency_ms,
+                "estimated_cost_usd": outcome.estimated_cost_usd,
+            }
             self.repository.complete_tool(
                 principal,
                 run.run_id,
                 tool_name="reasoning",
-                result=None,
-                metadata={"error_code": code},
-                status="failed",
+                result=outcome.result.model_dump(mode="json"),
+                metadata=metadata,
+                status="completed",
                 now=self.clock(),
             )
-            if isinstance(exc, ReasoningFailure):
-                raise
-            raise ReasoningFailure(code, "Reasoning citation validation failed") from exc
-        metadata = {
-            "model_id": outcome.model_id,
-            "prompt_hash": outcome.prompt_hash,
-            "input_hash": outcome.input_hash,
-            "output_hash": outcome.output_hash,
-            "input_tokens": outcome.input_tokens,
-            "output_tokens": outcome.output_tokens,
-            "latency_ms": outcome.latency_ms,
-            "estimated_cost_usd": outcome.estimated_cost_usd,
-        }
-        self.repository.complete_tool(
-            principal,
-            run.run_id,
-            tool_name="reasoning",
-            result=outcome.result.model_dump(mode="json"),
-            metadata=metadata,
-            status="completed",
-            now=self.clock(),
-        )
-        return outcome
+            return outcome
 
     def _escalate(self, principal: Principal, run: RunRecord, code: str) -> RunRecord:
         return self.repository.transition(
