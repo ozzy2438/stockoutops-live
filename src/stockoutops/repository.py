@@ -68,6 +68,10 @@ def _run(row: dict[str, Any]) -> RunRecord:
     )
 
 
+class _IdempotencyRaceLost(Exception):
+    """Internal control-flow signal: another transaction committed this key first."""
+
+
 class Repository:
     """All public tenant-scoped methods take Principal first and filter tenant_id."""
 
@@ -129,7 +133,95 @@ class Repository:
                 """,
                 (principal.tenant_id, idempotency_key),
             ).fetchone()
-            if existing:
+            if existing is None:
+                run_id = uuid4()
+                won_race = True
+                try:
+                    with connection.transaction():
+                        row = connection.execute(
+                            """
+                            INSERT INTO investigation_run (
+                                run_id, tenant_id, requested_by, assigned_reviewer_id,
+                                sku_id, store_id, supplier_id, as_of_ts, window_start,
+                                window_end, request_hash, state, state_version,
+                                created_at, updated_at
+                            ) VALUES (
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                'created', 0, %s, %s
+                            )
+                            RETURNING *
+                            """,
+                            (
+                                run_id,
+                                principal.tenant_id,
+                                principal.actor_id,
+                                assigned_reviewer_id,
+                                request.sku_id,
+                                request.store_id,
+                                request.supplier_id,
+                                request.as_of_ts,
+                                request.window_start,
+                                request.window_end,
+                                payload_hash,
+                                now,
+                                now,
+                            ),
+                        ).fetchone()
+                        # ON CONFLICT DO NOTHING makes concurrent inserts of the same
+                        # (tenant_id, idempotency_key) resolve via Postgres's native
+                        # unique-index wait: the loser blocks until the winner commits,
+                        # then sees the conflict and returns no row instead of raising.
+                        claimed = connection.execute(
+                            """
+                            INSERT INTO idempotency_key (
+                                tenant_id, idempotency_key, payload_hash, run_id, created_at
+                            ) VALUES (%s, %s, %s, %s, %s)
+                            ON CONFLICT (tenant_id, idempotency_key) DO NOTHING
+                            RETURNING run_id
+                            """,
+                            (
+                                principal.tenant_id,
+                                idempotency_key,
+                                payload_hash,
+                                run_id,
+                                now,
+                            ),
+                        ).fetchone()
+                        if claimed is None:
+                            won_race = False
+                            raise _IdempotencyRaceLost()
+                        self._insert_event(
+                            connection,
+                            run_id=run_id,
+                            tenant_id=principal.tenant_id,
+                            event_type="run_created",
+                            from_state=None,
+                            to_state=RunState.CREATED,
+                            actor_id=principal.actor_id,
+                            payload={"request_hash": payload_hash},
+                            occurred_at=now,
+                        )
+                except _IdempotencyRaceLost:
+                    pass
+                if won_race:
+                    result = _run(row)
+                    created = True
+                else:
+                    # The savepoint rollback above discarded our unclaimed
+                    # investigation_run insert; the winner's key row is now
+                    # visible (its transaction committed before ours could
+                    # proceed past the unique-index wait).
+                    existing = connection.execute(
+                        """
+                        SELECT payload_hash, run_id
+                        FROM idempotency_key
+                        WHERE tenant_id = %s AND idempotency_key = %s
+                        """,
+                        (principal.tenant_id, idempotency_key),
+                    ).fetchone()
+                    if existing is None:
+                        raise RuntimeError("Idempotency key conflict resolution failed")
+            if existing is not None and result is None:
                 row = connection.execute(
                     """
                     SELECT *
@@ -157,64 +249,6 @@ class Repository:
                         "IDEMPOTENCY_KEY_CONFLICT",
                         "Idempotency key was already used with a different payload",
                     )
-            else:
-                run_id = uuid4()
-                row = connection.execute(
-                    """
-                    INSERT INTO investigation_run (
-                        run_id, tenant_id, requested_by, assigned_reviewer_id,
-                        sku_id, store_id, supplier_id, as_of_ts, window_start,
-                        window_end, request_hash, state, state_version,
-                        created_at, updated_at
-                    ) VALUES (
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        'created', 0, %s, %s
-                    )
-                    RETURNING *
-                    """,
-                    (
-                        run_id,
-                        principal.tenant_id,
-                        principal.actor_id,
-                        assigned_reviewer_id,
-                        request.sku_id,
-                        request.store_id,
-                        request.supplier_id,
-                        request.as_of_ts,
-                        request.window_start,
-                        request.window_end,
-                        payload_hash,
-                        now,
-                        now,
-                    ),
-                ).fetchone()
-                connection.execute(
-                    """
-                    INSERT INTO idempotency_key (
-                        tenant_id, idempotency_key, payload_hash, run_id, created_at
-                    ) VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (
-                        principal.tenant_id,
-                        idempotency_key,
-                        payload_hash,
-                        run_id,
-                        now,
-                    ),
-                )
-                self._insert_event(
-                    connection,
-                    run_id=run_id,
-                    tenant_id=principal.tenant_id,
-                    event_type="run_created",
-                    from_state=None,
-                    to_state=RunState.CREATED,
-                    actor_id=principal.actor_id,
-                    payload={"request_hash": payload_hash},
-                    occurred_at=now,
-                )
-                result = _run(row)
-                created = True
         if conflict:
             raise conflict
         if result is None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
@@ -9,7 +10,12 @@ from uuid import UUID
 
 from pydantic import ValidationError as PydanticValidationError
 
-from stockoutops.errors import AuthorizationError, StockoutOpsError, ValidationError
+from stockoutops.errors import (
+    AuthorizationError,
+    ConflictError,
+    StockoutOpsError,
+    ValidationError,
+)
 from stockoutops.evidence.contracts import (
     Evidence,
     EvidenceFailure,
@@ -27,6 +33,15 @@ from stockoutops.state_machine import RunState
 
 Clock = Callable[[], datetime]
 REVIEW_POLICY = timedelta(hours=24)
+
+# Bound how long a concurrent idempotent-replay caller waits for a peer's
+# in-flight tool_invocation (started by the same run_id+tool_name) to reach a
+# terminal status, before treating it as stuck. Deliberately short: the M1
+# tools are local fixture reads / a deterministic stub, so a genuine peer
+# finishes in low milliseconds; this only smooths the race window between one
+# caller's INSERT commit and its own completion write.
+_CONCURRENT_TOOL_WAIT_ATTEMPTS = 50
+_CONCURRENT_TOOL_WAIT_INTERVAL_S = 0.02
 
 
 def utc_now() -> datetime:
@@ -74,6 +89,19 @@ class InvestigationService:
         return self._resume(principal, run), created
 
     def _resume(self, principal: Principal, run: RunRecord) -> RunRecord:
+        while True:
+            try:
+                return self._resume_step(principal, run)
+            except ConflictError as exc:
+                if exc.code != "STATE_VERSION_CONFLICT":
+                    raise
+                # A concurrent idempotent-replay caller already applied this
+                # exact transition; converge on the current row instead of
+                # surfacing an error for what is, from the caller's
+                # perspective, a duplicate of the same accepted request.
+                run = self.repository.get_run(principal, run.run_id)
+
+    def _resume_step(self, principal: Principal, run: RunRecord) -> RunRecord:
         while True:
             if run.state == RunState.CREATED:
                 run = self.repository.transition(
@@ -155,6 +183,28 @@ class InvestigationService:
             else:
                 return run
 
+    def _await_tool(
+        self, principal: Principal, run_id: UUID, tool_name: str
+    ) -> dict[str, object] | None:
+        """Poll a tool_invocation row until it leaves 'started', bounded.
+
+        Only used when this caller lost the record_tool_start race to a
+        concurrent duplicate of the same idempotent request. It never
+        initiates or retries work itself; it just waits for the one true
+        in-flight attempt to reach a terminal status.
+        """
+        row = self.repository.get_tool(principal, run_id, tool_name)
+        attempts = 0
+        while (
+            row is not None
+            and row["status"] == "started"
+            and attempts < _CONCURRENT_TOOL_WAIT_ATTEMPTS
+        ):
+            time.sleep(_CONCURRENT_TOOL_WAIT_INTERVAL_S)
+            row = self.repository.get_tool(principal, run_id, tool_name)
+            attempts += 1
+        return row
+
     def _gather_evidence(self, principal: Principal, run: RunRecord) -> list[Evidence]:
         specs = (
             (
@@ -207,6 +257,11 @@ class InvestigationService:
         evidence: list[Evidence] = []
         for tool_name, query, invoke in specs:
             existing = self.repository.get_tool(principal, run.run_id, tool_name)
+            if existing and existing["status"] == "started":
+                # A concurrent duplicate of this same request may still be
+                # mid-flight on this exact tool; wait for it to finish
+                # instead of treating it as a forbidden retry.
+                existing = self._await_tool(principal, run.run_id, tool_name)
             if existing:
                 if existing["status"] != "completed" or existing["result_json"] is None:
                     raise EvidenceFailure(
@@ -223,6 +278,14 @@ class InvestigationService:
                 now=self.clock(),
             )
             if not started:
+                resolved = self._await_tool(principal, run.run_id, tool_name)
+                if (
+                    resolved is not None
+                    and resolved["status"] == "completed"
+                    and resolved["result_json"] is not None
+                ):
+                    evidence.append(parse_evidence(resolved["result_json"]))
+                    continue
                 raise EvidenceFailure(
                     "EVIDENCE_RETRY_FORBIDDEN",
                     f"{tool_name} invocation already exists",
@@ -252,23 +315,30 @@ class InvestigationService:
             evidence.append(item)
         return evidence
 
+    def _reason_outcome_from_row(self, row: dict[str, object]) -> ReasoningOutcome:
+        result = ReasoningResult.model_validate(row["result_json"])
+        metadata = row["metadata_json"]
+        return ReasoningOutcome(
+            result=result,
+            model_id=metadata["model_id"],
+            prompt_hash=metadata["prompt_hash"],
+            input_hash=metadata["input_hash"],
+            output_hash=metadata["output_hash"],
+            input_tokens=metadata.get("input_tokens"),
+            output_tokens=metadata.get("output_tokens"),
+            latency_ms=metadata["latency_ms"],
+            estimated_cost_usd=metadata.get("estimated_cost_usd"),
+        )
+
     def _reason_once(self, principal: Principal, run: RunRecord) -> ReasoningOutcome:
         existing = self.repository.get_tool(principal, run.run_id, "reasoning")
+        if existing and existing["status"] == "started":
+            # A concurrent duplicate of this same request may still be
+            # mid-flight on reasoning; wait for it instead of forbidding.
+            existing = self._await_tool(principal, run.run_id, "reasoning")
         if existing:
             if existing["status"] == "completed" and existing["result_json"]:
-                result = ReasoningResult.model_validate(existing["result_json"])
-                metadata = existing["metadata_json"]
-                return ReasoningOutcome(
-                    result=result,
-                    model_id=metadata["model_id"],
-                    prompt_hash=metadata["prompt_hash"],
-                    input_hash=metadata["input_hash"],
-                    output_hash=metadata["output_hash"],
-                    input_tokens=metadata.get("input_tokens"),
-                    output_tokens=metadata.get("output_tokens"),
-                    latency_ms=metadata["latency_ms"],
-                    estimated_cost_usd=metadata.get("estimated_cost_usd"),
-                )
+                return self._reason_outcome_from_row(existing)
             raise ReasoningFailure(
                 "REASONING_RETRY_FORBIDDEN",
                 "A reasoning invocation already exists and automatic retry is forbidden",
@@ -282,6 +352,13 @@ class InvestigationService:
             request_hash=request_hash,
             now=self.clock(),
         ):
+            resolved = self._await_tool(principal, run.run_id, "reasoning")
+            if (
+                resolved is not None
+                and resolved["status"] == "completed"
+                and resolved["result_json"]
+            ):
+                return self._reason_outcome_from_row(resolved)
             raise ReasoningFailure(
                 "REASONING_RETRY_FORBIDDEN", "Reasoning invocation already exists"
             )
