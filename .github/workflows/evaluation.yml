@@ -1,24 +1,25 @@
-# Milestone-0 notice only. No evaluation harness or cases exist yet.
-# Enable blocking evaluation jobs only after M0 approval and implementation.
-name: evaluation-scaffold
+# Governance notice only. Exact-head CI runs the controlled-synthetic M2 foundation.
+# Genuine G0/G1/UAT evaluation remains disabled until separately authorised.
+name: evaluation-boundary
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Planned future mode (no evaluation runs in M0)"
+        description: "Evidence boundary to display (this workflow runs no evaluation)"
         required: true
-        default: "replay"
+        default: "simulated-shadow-foundation"
         type: choice
-        options: [replay, shadow, uat-summary]
+        options: [simulated-shadow-foundation, replay, genuine-shadow, uat-summary]
 
 jobs:
-  m0-notice:
-    name: M0 scaffold notice (not an evaluation)
+  boundary-notice:
+    name: Evaluation boundary notice
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Confirm evaluation is not implemented
+      - name: Confirm this workflow makes no gate claim
         run: |
-          echo "No evaluation was executed. This is a Milestone-0 scaffold notice."
-          echo "See docs/08_evaluation_plan.md and evaluation/replay/README.md."
+          echo "No evaluation was executed by this notice workflow."
+          echo "M2 controlled-synthetic engineering checks run in ci.yml."
+          echo "Genuine G0/G1/UAT evaluation remains pending under docs/08_evaluation_plan.md."

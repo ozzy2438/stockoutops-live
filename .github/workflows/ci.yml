@@ -1,4 +1,4 @@
-# CI — repository hygiene plus the local-only deterministic M1 implementation checks.
+# CI — repository hygiene, M1 regression, and local deterministic M2 shadow checks.
 # No OpenAI secret, model network call, AWS resource, or external write is used.
 name: ci
 
@@ -73,6 +73,7 @@ jobs:
       - name: Verify fixtures and migrate empty PostgreSQL
         run: |
           python -c "from pathlib import Path; from stockoutops.evidence.manifest import verify_manifest; print(verify_manifest(Path('fixtures/v1')))"
+          python -c "from pathlib import Path; from stockoutops.shadow.cases import load_case_pack; loaded = load_case_pack(Path('evaluation/shadow/cases/v1')); print(loaded.pack.case_pack_version, len(loaded.pack.cases))"
           python -m stockoutops.database
           python -m stockoutops.database
           python -m stockoutops.evidence.seed
@@ -92,5 +93,18 @@ jobs:
             sleep 1
           done
           python -m stockoutops.smoke
+      - name: Execute-false M2 shadow pilot and deterministic reports
+        run: |
+          python -m stockoutops.shadow.cli \
+            --git-sha "$GITHUB_SHA" \
+            --test-evidence "MEASURED — full pytest completed earlier in this exact CI job."
+          python -c "import json; from pathlib import Path; report = json.loads(Path('evaluation/reports/m2-shadow-foundation-pilot.json').read_text()); assert report['controls']['execute'] is False; assert report['controls']['external_action_count'] == 0; assert report['case_pack']['case_count'] >= 12; print(report['metrics'])"
+      - name: Scan tracked files for common live credential patterns
+        run: |
+          if git grep -nE '(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16})' -- .; then
+            echo "Potential live credential pattern found"
+            exit 1
+          fi
+          echo "No common OpenAI or AWS access-key pattern found in tracked files."
       - name: Build application image
         run: docker build -t stockoutops-live:m1-ci .
