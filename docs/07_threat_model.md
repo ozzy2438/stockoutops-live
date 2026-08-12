@@ -1,6 +1,6 @@
 # 07 — Security, Privacy & Threat Model
 
-> Owner: Honey. Reviewer: Fizz. Status: **proposed Milestone-0 planning baseline; not implemented**. Unresolved technical controls remain gated by `13_risks_and_open_decisions.md`. Method: STRIDE per trust boundary, plus AI-specific threat classes.
+> Owner: Honey. Reviewer: Fizz. Status: **Milestone-0 planning baseline; bounded M1 local controls implemented and M2 shadow delta pending assurance**. Unresolved production controls remain gated by `13_risks_and_open_decisions.md`. Method: STRIDE per trust boundary, plus AI-specific threat classes.
 
 ## Trust boundaries
 
@@ -63,6 +63,25 @@
 - Stale data → halt + escalate.
 - Authz check failure → halt + audit + alert.
 - LLM timeout / provider error → halt + fall back to “human-only” mode.
+
+## M2 execute-false shadow threat-model diff
+
+This local M2 candidate adds controlled-synthetic case ingestion, shadow persistence,
+and generated reports. It does not add a live user, model call, egress path, or
+external write integration.
+
+| Threat | Implemented local control | Residual / limit |
+|---|---|---|
+| Execution or autonomy drift | Strict case contract, service precondition, and database checks all require `execute=false`; external-action count is constrained to zero; no executor exists | This proves only the local code/database path, not future deployment policy |
+| Shadow result mistaken for operator work | Investigation rows are marked `run_mode=shadow`; server review rejects decisions and the local page disables decision controls | No genuine user/UI acceptance has been performed |
+| Case or reference tampering | Versioned strict JSON plus committed SHA-256 manifest; output and diff hashes persisted | Git history and database triggers are not WORM or cryptographic attestation |
+| Tenant leakage | Every shadow repository method takes `Principal` first and filters tenant; cross-tenant reads/process attempts return not found | Local simulated principal boundary; no production IdP or RLS |
+| Duplicate concurrent processing | Fixed-order advisory locks cover idempotency and case identity; M1 idempotency preserves one analysis/reasoning invocation | Crash recovery retains M1's existing manual-inspection limitation for abandoned tool calls |
+| Result/audit mutation | One controlled `started` → terminal update; terminal shadow runs, diffs, and control events reject update/delete through privileges and triggers | Migration/admin role remains privileged in the local test environment |
+| Synthetic evidence misrepresented as live quality | Fixed report title and `SIMULATED` / `controlled_synthetic_reference` labels; M2-03 through M2-06 remain pending | Human governance review is still required before publication or promotion |
+
+The fixture seeder requires the migration/admin role and is local test tooling only.
+The processor itself uses the restricted application role and the deterministic stub.
 
 ## Diff process
 

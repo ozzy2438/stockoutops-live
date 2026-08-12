@@ -2,7 +2,7 @@
 
 **Human-Supervised AI Decisioning & Reliability Platform**
 
-> **Current implementation status: M1 local simulated human-supervised vertical slice — implementation candidate pending evidence and assurance.** This is not production-ready, production-proven, deployed to AWS, or evidence of model or business quality. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
+> **Current implementation status: M1 local slice closed; M2 execute-false shadow engineering foundation — implementation candidate pending Buzz/Fizz assurance.** This is not production-ready, production-proven, a current AWS deployment, live UAT, or evidence of model or business quality. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
 
 StockoutOps Live is the new canonical Phase-2 implementation. The [PharmaRetail AI Control Tower](https://github.com/ozzy2438/PharmaRetail-AI-Control-Tower) is reference material only; useful patterns may be selectively migrated after review, but the old project is not a runtime dependency or a codebase to copy wholesale.
 
@@ -57,6 +57,28 @@ for inspection; migrations are forward-only and non-destructive.
 
 No live OpenAI call was made during M1-I1 implementation. The OpenAI adapter is tested
 with an injected mock only; local and CI execution use `DeterministicStubAdapter`.
+
+## M2 execute-false shadow foundation
+
+The M2 engineering candidate reuses the bounded M1 intake and T1–T3 analysis path,
+then stores a separate shadow result and deterministic field-level diff. It never
+creates a human review decision or an external action. Caller input, the processor,
+and PostgreSQL all enforce `execute=false`; `execute=true` fails before analysis.
+
+After `make migrate`, run:
+
+```bash
+make shadow-cases
+make shadow-pilot
+```
+
+The pilot verifies and seeds the versioned controlled-synthetic pack under
+`evaluation/shadow/cases/v1/`, runs 12 deterministic cases, and generates per-case
+JSON plus aggregate JSON/Markdown under ignored `evaluation/reports/` paths. These
+artefacts are labelled **M2 SHADOW FOUNDATION — SIMULATED ENGINEERING REHEARSAL**.
+They are not genuine analyst, UAT, production, model-quality, or G1-exit evidence.
+See `evaluation/shadow/README.md` for persistence, report, recovery, rollback, and
+current M2 limitations.
 
 ---
 
@@ -193,6 +215,7 @@ Only `APPROVE` opens a milestone gate. `APPROVE WITH CONDITIONS` pauses merge an
 ├── observability/              # Dashboards, alert rules, SLO defs
 ├── infra/                      # IaC, deployment, secrets scaffolding
 ├── src/stockoutops/            # Bounded M1 application
+│   └── shadow/                 # Execute-false M2 processor/diff foundation
 ├── migrations/                 # Ordered, forward-only PostgreSQL SQL
 ├── fixtures/v1/                # Hash-manifested simulated T1–T3 fixtures
 ├── tests/                      # Unit and real-PostgreSQL integration tests

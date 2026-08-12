@@ -106,8 +106,12 @@ The former M1-01–M1-10 package is preserved but is not executable M1 authority
 
 ## Milestone 2 — Shadow Mode (G1)
 
-- [ ] M2-01 — Shadow processor implemented (`execute=false`).
-- [ ] M2-02 — Diff-report tooling.
+> Issue #17 is authorised only for the local M2-01/M2-02 engineering foundation.
+> The controlled-synthetic pilot is not live UAT or G1 exit evidence. Foundation
+> implementation remains pending Buzz/Fizz assurance and owner merge decision.
+
+- [ ] M2-01 — Shadow processor engineering foundation implemented (`execute=false`) — pending Buzz/Fizz assurance.
+- [ ] M2-02 — Deterministic diff-report engineering foundation implemented — pending Buzz/Fizz assurance.
 - [ ] M2-03 — UAT user recruitment (≥ 3) + consent forms.
 - [ ] M2-04 — SLO alerts wired.
 - [ ] M2-05 — First 100 shadow cases analysed; disagreement characterisation.

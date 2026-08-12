@@ -3,6 +3,11 @@
 The suite covers deterministic unit contracts and integration against real
 PostgreSQL 16. SQLite and mocked database substitutes are not used.
 
+M2 coverage includes execute-false controls, case/manifest contracts, deterministic
+diff/report output, tenant isolation, idempotency and conflict handling,
+mutation-controlled results, restart recovery, and real-PostgreSQL same-case
+concurrency.
+
 ```bash
 make test
 ```
