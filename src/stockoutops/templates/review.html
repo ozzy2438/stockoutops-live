@@ -71,13 +71,23 @@
           }
           evidence.textContent = JSON.stringify(currentRun.evidence, null, 2);
           draft.value = JSON.stringify(currentRun.draft, null, 2);
-          result.textContent = `State: ${currentRun.state}`;
+          const isShadow = currentRun.run_mode === "shadow";
+          document.querySelectorAll("button[data-action]").forEach((button) => {
+            button.disabled = isShadow;
+          });
+          result.textContent = isShadow
+            ? "Shadow engineering result only; human decisions are disabled."
+            : `State: ${currentRun.state}`;
         });
 
         document.querySelectorAll("button[data-action]").forEach((button) => {
           button.addEventListener("click", async () => {
             if (!currentRun) {
               result.textContent = "Load an investigation first.";
+              return;
+            }
+            if (currentRun.run_mode === "shadow") {
+              result.textContent = "Shadow engineering result cannot accept a review decision.";
               return;
             }
             const action = button.dataset.action;

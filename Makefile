@@ -1,7 +1,7 @@
 PYTHON := .venv/bin/python
 PIP := .venv/bin/pip
 
-.PHONY: setup up migrate seed serve lint test smoke-stub down docker-build
+.PHONY: setup up migrate seed shadow-cases shadow-pilot serve lint test smoke-stub down docker-build
 
 setup:
 	python3.12 -m venv .venv
@@ -16,6 +16,12 @@ migrate:
 
 seed:
 	$(PYTHON) -m stockoutops.evidence.seed
+
+shadow-cases:
+	$(PYTHON) -c "from pathlib import Path; from stockoutops.shadow.cases import load_case_pack; loaded = load_case_pack(Path('evaluation/shadow/cases/v1')); print(loaded.pack.case_pack_version, len(loaded.pack.cases))"
+
+shadow-pilot:
+	$(PYTHON) -m stockoutops.shadow.cli
 
 serve:
 	$(PYTHON) -m uvicorn stockoutops.app:create_app --factory --host 127.0.0.1 --port 8000

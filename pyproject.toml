@@ -29,6 +29,7 @@ test = [
 stockoutops-migrate = "stockoutops.database:main"
 stockoutops-seed = "stockoutops.evidence.seed:main"
 stockoutops-smoke = "stockoutops.smoke:main"
+stockoutops-shadow-pilot = "stockoutops.shadow.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/stockoutops"]
