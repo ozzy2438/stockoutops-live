@@ -37,6 +37,7 @@ class RunRecord:
     window_start: datetime
     window_end: datetime
     request_hash: str
+    run_mode: str
     state: RunState
     state_version: int
     draft_json: dict[str, object] | None
@@ -60,6 +61,7 @@ def _run(row: dict[str, Any]) -> RunRecord:
         window_start=row["window_start"],
         window_end=row["window_end"],
         request_hash=row["request_hash"],
+        run_mode=row["run_mode"],
         state=RunState(row["state"]),
         state_version=row["state_version"],
         draft_json=row["draft_json"],
@@ -161,6 +163,7 @@ class Repository:
         payload_hash: str,
         assigned_reviewer_id: str,
         now: datetime,
+        run_mode: str = "human_review",
     ) -> tuple[RunRecord, bool]:
         conflict: ConflictError | None = None
         result: RunRecord | None = None
@@ -185,10 +188,10 @@ class Repository:
                             INSERT INTO investigation_run (
                                 run_id, tenant_id, requested_by, assigned_reviewer_id,
                                 sku_id, store_id, supplier_id, as_of_ts, window_start,
-                                window_end, request_hash, state, state_version,
+                                window_end, request_hash, run_mode, state, state_version,
                                 created_at, updated_at
                             ) VALUES (
-                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                                 'created', 0, %s, %s
                             )
                             RETURNING *
@@ -205,6 +208,7 @@ class Repository:
                                 request.window_start,
                                 request.window_end,
                                 payload_hash,
+                                run_mode,
                                 now,
                                 now,
                             ),
@@ -598,7 +602,12 @@ class Repository:
                 (run.run_id, principal.tenant_id),
             ).fetchone()
             code: str | None = None
-            if existing or run.state != RunState.AWAITING_HUMAN:
+            if run.run_mode == "shadow":
+                code = "SHADOW_REVIEW_FORBIDDEN"
+                pending_error = ConflictError(
+                    code, "Shadow analysis cannot accept a human review decision"
+                )
+            elif existing or run.state != RunState.AWAITING_HUMAN:
                 code = "RUN_ALREADY_DECIDED"
                 pending_error = ConflictError(code, "Run is not awaiting a review decision")
             elif principal.actor_id != run.assigned_reviewer_id:

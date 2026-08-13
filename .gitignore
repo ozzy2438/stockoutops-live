@@ -43,6 +43,11 @@ logs/
 data/local/
 .local/
 
+# Generated M2 shadow rehearsal reports (preserve final evidence under .buzz/OUTBOX)
+evaluation/reports/m2-shadow-foundation-pilot.json
+evaluation/reports/m2-shadow-foundation-pilot.md
+evaluation/reports/m2-shadow-foundation-cases/
+
 # Terraform / IaC
 .terraform/
 *.tfstate

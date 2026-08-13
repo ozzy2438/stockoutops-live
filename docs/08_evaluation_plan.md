@@ -1,6 +1,6 @@
 # 08 — Evaluation & Golden-Case Plan
 
-> Owner: Scout. Reviewer: Fizz. Status: **plan; no evaluation has been run for StockoutOps Live**.
+> Owner: Scout. Reviewer: Fizz. Status: **plan plus a simulated M2 engineering-rehearsal candidate; no genuine G0/G1 evaluation has been run**.
 
 ## Evaluation layers
 
@@ -71,6 +71,21 @@ Any change to model or prompt bundle triggers:
 1. Golden-case rerun in CI (block on regression).
 2. 100-case shadow run against the previous version.
 3. Fizz review of the diff report before promotion.
+
+## M2 shadow engineering foundation boundary
+
+`evaluation/shadow/cases/v1/` contains 12 versioned, controlled-synthetic cases for
+deterministic processor and diff-report testing. It uses no LLM-as-judge and compares
+only structured fields: state/escalation, recommendation action, confidence,
+evidence/citation coverage, unsupported citations, schema validity, provider/cost
+labels, and latency metadata.
+
+This pack is labelled **M2 SHADOW FOUNDATION — SIMULATED ENGINEERING REHEARSAL**.
+It is not the ≥34 golden-case gate suite, historical replay, an analyst-labelled
+sample, live UAT, the first 100 genuine shadow cases, or evidence for G1 exit. Its
+agreement metrics test deterministic tooling and disagreement characterisation only;
+they must not be cited as reasoning quality, accuracy, reliability, or business
+impact.
 
 ## Reporting cadence
 

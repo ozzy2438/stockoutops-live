@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from uuid import UUID
 
 from pydantic import ValidationError as PydanticValidationError
@@ -60,6 +61,7 @@ class InvestigationService:
         request: IntakeRequest,
         *,
         idempotency_key: str,
+        run_mode: Literal["human_review", "shadow"] = "human_review",
     ) -> tuple[RunRecord, bool]:
         if not principal.has_role("operator"):
             raise AuthorizationError("Operator role is required for intake")
@@ -75,6 +77,7 @@ class InvestigationService:
             payload_hash=payload_hash,
             assigned_reviewer_id=self.identity_provider.assigned_reviewer(principal.tenant_id),
             now=self.clock(),
+            run_mode=run_mode,
         )
         return self._resume(principal, run), created
 
@@ -415,6 +418,7 @@ class InvestigationService:
             "tenant_id": run.tenant_id,
             "state": run.state.value,
             "state_version": run.state_version,
+            "run_mode": run.run_mode,
             "sku_id": run.sku_id,
             "store_id": run.store_id,
             "supplier_id": run.supplier_id,

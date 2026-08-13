@@ -1,6 +1,6 @@
 # 10 — Observability, SLOs & Cost
 
-> Owner: Bumble (build) + Honey (design) + Fizz (assurance). Status: **TARGET plan; no live signals, SLO evidence, dashboards, or alerts exist**.
+> Owner: Bumble (build) + Honey (design) + Fizz (assurance). Status: **TARGET plan; M2 adds local report metadata only, with no live SLO evidence, dashboards, or alerts**.
 
 ## Signals
 
@@ -49,6 +49,16 @@ Append-only log with per-tenant partitioning; integrity-hashed periodically.
 - Cost per investigation > 2× rolling median for 1h → SEV3 + email.
 - Tool error rate > 5% over 15 min → SEV3.
 - LLM provider error rate > 10% over 5 min → SEV3 + auto-failover to human-only mode.
+
+### M2 shadow foundation boundary
+
+The controlled-synthetic pilot records only the fields needed for reproducible local
+comparison: case outcome, agreement/disagreement counts, deterministic-provider
+latency metadata, error category, and external-action count. Cost is labelled
+`SIMULATED` or `UNMEASURED`; it is not a production cost measurement.
+
+**M2-04 SLO alerts — PENDING.** No alarm, dashboard, error-budget, SLO attainment,
+or production observability claim is created by the M2-01/M2-02 foundation.
 
 ## Dashboards
 

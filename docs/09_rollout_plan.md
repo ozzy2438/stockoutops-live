@@ -1,6 +1,6 @@
 # 09 — Rollout Plan (Historical replay → Shadow → Assisted UAT → Canary → Controlled)
 
-> Owner: Bumble (execution) + Scout (evidence) + Fizz (verdict). Status: **plan; no gate has started**.
+> Owner: Bumble (execution) + Scout (evidence) + Fizz (verdict). Status: **plan; the local simulated M2 foundation is not a started or passed rollout gate**.
 
 ## Gate 0 — Historical replay
 
@@ -17,6 +17,10 @@
 - Measurement: side-by-side diff against analyst decision; agreement, missed evidence, hypothetical impact.
 - Exit criteria: G1→G2 gate met.
 - Rollback: disable shadow processor via feature flag.
+
+The 12-case controlled-synthetic M2 engineering rehearsal is a processor/diff
+foundation only. It has no live UAT cases or analyst decisions and cannot satisfy any
+Gate 1 entry, measurement, duration, or exit criterion.
 
 ## Gate 2 — Assisted operation
 

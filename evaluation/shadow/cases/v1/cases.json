@@ -1,0 +1,413 @@
+{
+  "case_pack_version": "m2-shadow-cases-v1-2026-08-13",
+  "evidence_label": "M2 SHADOW FOUNDATION — SIMULATED ENGINEERING REHEARSAL",
+  "cases": [
+    {
+      "case_id": "m2-supplier-delay-001",
+      "case_version": "v1",
+      "category": "supplier_delay",
+      "tenant_id": "t_alpha",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-001",
+        "store_id": "M2-STORE-001",
+        "supplier_id": "M2-SUPPLIER-001",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {
+        "expected_state": "awaiting_human",
+        "root_cause_statement": "Simulated inventory availability is below recent demand while supplier evidence indicates replenishment timing risk.",
+        "recommendation_action_type": "review_replenishment",
+        "confidence": "medium"
+      },
+      "reference_escalation_expectation": {"expected": false, "code": null},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory", "T2_sales_demand", "T3_supplier"],
+        "minimum_unique_citations": 3
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 2, "reserved": 1, "on_order": 0, "updated_at": "2026-08-10T08:00:00Z"},
+        "demand": {"units_sold": 56, "average_daily_units": 8, "demand_signal": "above_available_stock", "updated_at": "2026-08-09T12:00:00Z"},
+        "supplier": {"open_order_quantity": 0, "expected_receipt_at": "2026-08-14T12:00:00Z", "historical_lead_time_days": 4, "status": "delayed", "updated_at": "2026-08-08T18:00:00Z"}
+      },
+      "notes": "Controlled supplier-delay rehearsal with low available inventory.",
+      "limitations": ["Synthetic facts and deterministic stub output; no analyst judgement."]
+    },
+    {
+      "case_id": "m2-supplier-delay-002",
+      "case_version": "v1",
+      "category": "supplier_delay",
+      "tenant_id": "t_beta",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-002",
+        "store_id": "M2-STORE-002",
+        "supplier_id": "M2-SUPPLIER-002",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {
+        "expected_state": "awaiting_human",
+        "root_cause_statement": "Simulated inventory availability is below recent demand while supplier evidence indicates replenishment timing risk.",
+        "recommendation_action_type": "review_replenishment",
+        "confidence": "medium"
+      },
+      "reference_escalation_expectation": {"expected": false, "code": null},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory", "T2_sales_demand", "T3_supplier"],
+        "minimum_unique_citations": 3
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 1, "reserved": 1, "on_order": 5, "updated_at": "2026-08-10T09:00:00Z"},
+        "demand": {"units_sold": 35, "average_daily_units": 5, "demand_signal": "stable_but_uncovered", "updated_at": "2026-08-09T10:00:00Z"},
+        "supplier": {"open_order_quantity": 5, "expected_receipt_at": "2026-08-16T12:00:00Z", "historical_lead_time_days": 3, "status": "delayed", "updated_at": "2026-08-09T00:00:00Z"}
+      },
+      "notes": "Controlled delayed receipt despite an open order.",
+      "limitations": ["Synthetic facts and deterministic stub output; no analyst judgement."]
+    },
+    {
+      "case_id": "m2-lead-time-003",
+      "case_version": "v1",
+      "category": "supplier_lead_time",
+      "tenant_id": "t_alpha",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-003",
+        "store_id": "M2-STORE-003",
+        "supplier_id": "M2-SUPPLIER-003",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {
+        "expected_state": "awaiting_human",
+        "root_cause_statement": "Simulated inventory availability is below recent demand while supplier evidence indicates replenishment timing risk.",
+        "recommendation_action_type": "review_replenishment",
+        "confidence": "medium"
+      },
+      "reference_escalation_expectation": {"expected": false, "code": null},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory", "T2_sales_demand", "T3_supplier"],
+        "minimum_unique_citations": 3
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 3, "reserved": 2, "on_order": 12, "updated_at": "2026-08-10T10:00:00Z"},
+        "demand": {"units_sold": 42, "average_daily_units": 6, "demand_signal": "above_available_stock", "updated_at": "2026-08-09T08:00:00Z"},
+        "supplier": {"open_order_quantity": 12, "expected_receipt_at": "2026-08-20T12:00:00Z", "historical_lead_time_days": 10, "status": "lead_time_extended", "updated_at": "2026-08-08T12:00:00Z"}
+      },
+      "notes": "Controlled long lead-time case inside the existing T3 boundary.",
+      "limitations": ["Synthetic facts and deterministic stub output; no analyst judgement."]
+    },
+    {
+      "case_id": "m2-demand-spike-004",
+      "case_version": "v1",
+      "category": "demand_spike",
+      "tenant_id": "t_beta",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-004",
+        "store_id": "M2-STORE-004",
+        "supplier_id": "M2-SUPPLIER-004",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {
+        "expected_state": "awaiting_human",
+        "root_cause_statement": "Simulated inventory availability is below recent demand while supplier evidence indicates replenishment timing risk.",
+        "recommendation_action_type": "review_replenishment",
+        "confidence": "medium"
+      },
+      "reference_escalation_expectation": {"expected": false, "code": null},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory", "T2_sales_demand", "T3_supplier"],
+        "minimum_unique_citations": 3
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 10, "reserved": 2, "on_order": 15, "updated_at": "2026-08-10T07:00:00Z"},
+        "demand": {"units_sold": 140, "average_daily_units": 20, "demand_signal": "demand_spike", "updated_at": "2026-08-10T06:00:00Z"},
+        "supplier": {"open_order_quantity": 15, "expected_receipt_at": "2026-08-12T12:00:00Z", "historical_lead_time_days": 2, "status": "on_track", "updated_at": "2026-08-09T14:00:00Z"}
+      },
+      "notes": "Controlled demand spike with otherwise on-track supplier facts.",
+      "limitations": ["Synthetic facts and deterministic stub output; no analyst judgement."]
+    },
+    {
+      "case_id": "m2-demand-spike-005",
+      "case_version": "v1",
+      "category": "demand_spike",
+      "tenant_id": "t_alpha",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-005",
+        "store_id": "M2-STORE-005",
+        "supplier_id": "M2-SUPPLIER-005",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {
+        "expected_state": "awaiting_human",
+        "root_cause_statement": "Simulated inventory availability is below recent demand while supplier evidence indicates replenishment timing risk.",
+        "recommendation_action_type": "review_replenishment",
+        "confidence": "medium"
+      },
+      "reference_escalation_expectation": {"expected": false, "code": null},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory", "T2_sales_demand", "T3_supplier"],
+        "minimum_unique_citations": 3
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 8, "reserved": 4, "on_order": 8, "updated_at": "2026-08-10T10:30:00Z"},
+        "demand": {"units_sold": 105, "average_daily_units": 15, "demand_signal": "promotion_like_spike", "updated_at": "2026-08-09T20:00:00Z"},
+        "supplier": {"open_order_quantity": 8, "expected_receipt_at": "2026-08-13T12:00:00Z", "historical_lead_time_days": 3, "status": "on_track", "updated_at": "2026-08-09T09:00:00Z"}
+      },
+      "notes": "Controlled high-demand rehearsal without any real forecast or promotion feed.",
+      "limitations": ["Synthetic facts and deterministic stub output; no analyst judgement."]
+    },
+    {
+      "case_id": "m2-inventory-mismatch-006",
+      "case_version": "v1",
+      "category": "inventory_demand_mismatch",
+      "tenant_id": "t_beta",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-006",
+        "store_id": "M2-STORE-006",
+        "supplier_id": "M2-SUPPLIER-006",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {
+        "expected_state": "awaiting_human",
+        "root_cause_statement": "Simulated inventory availability is below recent demand while supplier evidence indicates replenishment timing risk.",
+        "recommendation_action_type": "review_replenishment",
+        "confidence": "medium"
+      },
+      "reference_escalation_expectation": {"expected": false, "code": null},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory", "T2_sales_demand", "T3_supplier"],
+        "minimum_unique_citations": 3
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 20, "reserved": 19, "on_order": 0, "updated_at": "2026-08-10T11:00:00Z"},
+        "demand": {"units_sold": 28, "average_daily_units": 4, "demand_signal": "reserved_inventory_mismatch", "updated_at": "2026-08-09T11:00:00Z"},
+        "supplier": {"open_order_quantity": 0, "expected_receipt_at": "2026-08-13T12:00:00Z", "historical_lead_time_days": 3, "status": "on_track", "updated_at": "2026-08-09T10:00:00Z"}
+      },
+      "notes": "Controlled mismatch where total stock masks low available inventory.",
+      "limitations": ["Synthetic facts and deterministic stub output; no analyst judgement."]
+    },
+    {
+      "case_id": "m2-missing-supplier-007",
+      "case_version": "v1",
+      "category": "missing_evidence",
+      "tenant_id": "t_alpha",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-007",
+        "store_id": "M2-STORE-007",
+        "supplier_id": "M2-SUPPLIER-007",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {"expected_state": "escalated", "root_cause_statement": null, "recommendation_action_type": null, "confidence": null},
+      "reference_escalation_expectation": {"expected": true, "code": "EVIDENCE_MISSING"},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory", "T2_sales_demand"],
+        "minimum_unique_citations": 0
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 2, "reserved": 0, "on_order": 0, "updated_at": "2026-08-10T08:00:00Z"},
+        "demand": {"units_sold": 49, "average_daily_units": 7, "demand_signal": "above_available_stock", "updated_at": "2026-08-09T12:00:00Z"},
+        "supplier": null
+      },
+      "notes": "Mandatory escalation rehearsal because T3 is absent.",
+      "limitations": ["Synthetic missing-data control; no analyst judgement."]
+    },
+    {
+      "case_id": "m2-missing-demand-008",
+      "case_version": "v1",
+      "category": "missing_evidence",
+      "tenant_id": "t_beta",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-008",
+        "store_id": "M2-STORE-008",
+        "supplier_id": "M2-SUPPLIER-008",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {"expected_state": "escalated", "root_cause_statement": null, "recommendation_action_type": null, "confidence": null},
+      "reference_escalation_expectation": {"expected": true, "code": "EVIDENCE_MISSING"},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory"],
+        "minimum_unique_citations": 0
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 4, "reserved": 1, "on_order": 4, "updated_at": "2026-08-10T08:00:00Z"},
+        "demand": null,
+        "supplier": {"open_order_quantity": 4, "expected_receipt_at": "2026-08-12T12:00:00Z", "historical_lead_time_days": 2, "status": "on_track", "updated_at": "2026-08-09T12:00:00Z"}
+      },
+      "notes": "Mandatory escalation rehearsal because T2 is absent.",
+      "limitations": ["Synthetic missing-data control; no analyst judgement."]
+    },
+    {
+      "case_id": "m2-stale-inventory-009",
+      "case_version": "v1",
+      "category": "stale_evidence",
+      "tenant_id": "t_alpha",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-009",
+        "store_id": "M2-STORE-009",
+        "supplier_id": "M2-SUPPLIER-009",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {"expected_state": "escalated", "root_cause_statement": null, "recommendation_action_type": null, "confidence": null},
+      "reference_escalation_expectation": {"expected": true, "code": "EVIDENCE_STALE"},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory", "T2_sales_demand", "T3_supplier"],
+        "minimum_unique_citations": 0
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 1, "reserved": 0, "on_order": 0, "updated_at": "2026-08-08T11:00:00Z"},
+        "demand": {"units_sold": 35, "average_daily_units": 5, "demand_signal": "above_available_stock", "updated_at": "2026-08-09T12:00:00Z"},
+        "supplier": {"open_order_quantity": 0, "expected_receipt_at": "2026-08-14T12:00:00Z", "historical_lead_time_days": 4, "status": "delayed", "updated_at": "2026-08-08T18:00:00Z"}
+      },
+      "notes": "Mandatory escalation rehearsal because T1 exceeds PT24H.",
+      "limitations": ["Synthetic stale-data control; no analyst judgement."]
+    },
+    {
+      "case_id": "m2-stale-supplier-010",
+      "case_version": "v1",
+      "category": "stale_evidence",
+      "tenant_id": "t_beta",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-010",
+        "store_id": "M2-STORE-010",
+        "supplier_id": "M2-SUPPLIER-010",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {"expected_state": "escalated", "root_cause_statement": null, "recommendation_action_type": null, "confidence": null},
+      "reference_escalation_expectation": {"expected": true, "code": "EVIDENCE_STALE"},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory", "T2_sales_demand", "T3_supplier"],
+        "minimum_unique_citations": 0
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 3, "reserved": 1, "on_order": 0, "updated_at": "2026-08-10T10:00:00Z"},
+        "demand": {"units_sold": 42, "average_daily_units": 6, "demand_signal": "above_available_stock", "updated_at": "2026-08-09T12:00:00Z"},
+        "supplier": {"open_order_quantity": 0, "expected_receipt_at": "2026-08-15T12:00:00Z", "historical_lead_time_days": 5, "status": "unknown", "updated_at": "2026-08-06T11:00:00Z"}
+      },
+      "notes": "Mandatory escalation rehearsal because T3 exceeds PT72H.",
+      "limitations": ["Synthetic stale-data control; no analyst judgement."]
+    },
+    {
+      "case_id": "m2-ambiguous-011",
+      "case_version": "v1",
+      "category": "ambiguous_evidence",
+      "tenant_id": "t_alpha",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-011",
+        "store_id": "M2-STORE-011",
+        "supplier_id": "M2-SUPPLIER-011",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {"expected_state": "escalated", "root_cause_statement": null, "recommendation_action_type": null, "confidence": null},
+      "reference_escalation_expectation": {"expected": true, "code": "INSUFFICIENT_EVIDENCE"},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory", "T2_sales_demand", "T3_supplier"],
+        "minimum_unique_citations": 3
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 10, "reserved": 9, "on_order": 10, "updated_at": "2026-08-10T09:00:00Z"},
+        "demand": {"units_sold": 7, "average_daily_units": 1, "demand_signal": "ambiguous", "updated_at": "2026-08-09T12:00:00Z"},
+        "supplier": {"open_order_quantity": 10, "expected_receipt_at": "2026-08-11T12:00:00Z", "historical_lead_time_days": 1, "status": "unknown", "updated_at": "2026-08-09T12:00:00Z"}
+      },
+      "notes": "Controlled reference expects escalation; current deterministic stub is expected to disagree.",
+      "limitations": ["The reference is synthetic and deliberately exercises disagreement reporting."]
+    },
+    {
+      "case_id": "m2-normal-monitor-012",
+      "case_version": "v1",
+      "category": "normal_inventory_demand",
+      "tenant_id": "t_beta",
+      "as_of_timestamp": "2026-08-10T12:00:00Z",
+      "execute": false,
+      "input": {
+        "sku_id": "M2-SKU-012",
+        "store_id": "M2-STORE-012",
+        "supplier_id": "M2-SUPPLIER-012",
+        "as_of_ts": "2026-08-10T12:00:00Z",
+        "window_start": "2026-08-03T12:00:00Z",
+        "window_end": "2026-08-10T12:00:00Z"
+      },
+      "baseline_source": "controlled_synthetic_reference",
+      "reference_outcome": {
+        "expected_state": "awaiting_human",
+        "root_cause_statement": "Simulated inventory availability is below recent demand while supplier evidence indicates replenishment timing risk.",
+        "recommendation_action_type": "monitor",
+        "confidence": "medium"
+      },
+      "reference_escalation_expectation": {"expected": false, "code": null},
+      "minimum_evidence_citation_expectations": {
+        "required_tools": ["T1_inventory", "T2_sales_demand", "T3_supplier"],
+        "minimum_unique_citations": 3
+      },
+      "provenance_label": "SIMULATED",
+      "fixture_setup": {
+        "inventory": {"on_hand": 40, "reserved": 2, "on_order": 20, "updated_at": "2026-08-10T10:00:00Z"},
+        "demand": {"units_sold": 14, "average_daily_units": 2, "demand_signal": "stable", "updated_at": "2026-08-09T12:00:00Z"},
+        "supplier": {"open_order_quantity": 20, "expected_receipt_at": "2026-08-11T12:00:00Z", "historical_lead_time_days": 2, "status": "on_track", "updated_at": "2026-08-09T12:00:00Z"}
+      },
+      "notes": "Controlled reference expects monitor; current deterministic stub is expected to disagree on action type.",
+      "limitations": ["The reference is synthetic and deliberately exercises disagreement reporting."]
+    }
+  ]
+}
