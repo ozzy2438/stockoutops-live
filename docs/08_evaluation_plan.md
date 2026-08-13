@@ -87,6 +87,14 @@ agreement metrics test deterministic tooling and disagreement characterisation o
 they must not be cited as reasoning quality, accuracy, reliability, or business
 impact.
 
+`missing_required_evidence_count` is the number of case-contract `required_tools`
+absent from actual evidence. See `evaluation/shadow/METRICS.md`. Historical reports
+that used a three-tool-slot actual count remain historical.
+
+Issue #19 adds a genuine-UAT JSON intake path and first-100 collection tooling.
+Synthetic cases contribute `0` to official M2-05. No genuine users or cases are
+created by that tooling.
+
 ## Reporting cadence
 
 - Weekly `evaluation/reports/YYYY-Www-report.md` starting M1.

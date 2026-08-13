@@ -29,3 +29,4 @@ We use lightweight ADRs (Michael Nygard style) to record decisions that constrai
 - `0003-use-explicit-m1-state-machine.md` — Accepted for M1; effective after scope-lock merge.
 - `0004-use-local-postgres-for-m1-state-and-evidence.md` — Accepted for M1; effective after scope-lock merge.
 - `0005-use-local-simulated-identity-for-m1.md` — Accepted for local M1; effective after scope-lock merge.
+- `0006-m2-uat-shadow-intake-boundary.md` — Proposed; genuine-UAT intake and contract-derived missing-evidence metric.

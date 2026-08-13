@@ -86,7 +86,8 @@ def clean_database(postgres_schema: None) -> None:
             """
             TRUNCATE TABLE
                 review_decision, tool_invocation, idempotency_key,
-                workflow_event, investigation_run
+                workflow_event, investigation_run,
+                shadow_case_intake_event, shadow_case_intake
             RESTART IDENTITY CASCADE
             """
         )

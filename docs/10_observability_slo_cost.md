@@ -58,7 +58,14 @@ latency metadata, error category, and external-action count. Cost is labelled
 `SIMULATED` or `UNMEASURED`; it is not a production cost measurement.
 
 **M2-04 SLO alerts — PENDING.** No alarm, dashboard, error-budget, SLO attainment,
-or production observability claim is created by the M2-01/M2-02 foundation.
+or production observability claim is created by the M2-01/M2-02 foundation or by
+the Issue #19 UAT/intake readiness bridge. Local report fields are not alerts.
+
+Future M2-04 input signals, when a later authorised task wires them, are expected
+to include: shadow agreement/disagreement counts, escalation disagreement,
+missing-required-evidence counts, unsupported-claim counts, `external_action_count`
+(must remain 0), and deterministic-provider latency metadata. Those signals are
+not wired now.
 
 ## Dashboards
 

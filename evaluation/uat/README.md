@@ -1,16 +1,24 @@
-# UAT & operator study (Gate 2)
+# UAT & operator study
 
-Records of assisted-operation usage and the controlled UAT operator study.
+This directory currently holds **templates and operating rules only**.
 
-## Contents
+> **OWNER / SCOUT ACTION REQUIRED — NO USERS RECRUITED YET**
 
-- Consent forms (redacted or template only in-repo).
-- Pre-registration document (metric, N, stopping rules).
-- Weekly UAT summaries.
-- Final operator-study report labelled **controlled UAT experiment** (never *production A/B*).
+M2-03 genuine external UAT recruitment and consent evidence has **not** been
+collected. The Gate 2 operator study remains later work.
 
-## Ethics & privacy
+## M2 readiness pack
 
-- No individual operator is identified in reports.
-- Case content follows tenant data-handling rules.
-- Retention per `docs/07_threat_model.md`.
+- `OWNER_SCOUT_ACTION_REQUIRED.md`
+- `SAFE_STORAGE_BOUNDARY.md`
+- `templates/` — invitation, consent/data-use, eligibility, de-identification,
+  submission, analyst-reference, withdrawal, session runbook, and labelling rules
+
+Signed consent and participant PII must remain outside this repository.
+
+## Later Gate 2 contents
+
+- Pre-registration document (metric, N, stopping rules)
+- Weekly UAT summaries
+- Final operator-study report labelled **controlled UAT experiment** (never
+  *production A/B*)

@@ -9,6 +9,7 @@ from stockoutops.shadow.contracts import (
     ShadowComparison,
     ShadowDiffEntry,
 )
+from stockoutops.shadow.metrics import missing_required_evidence_count
 
 
 def _entry(
@@ -34,6 +35,10 @@ def compare(case: ShadowCase, actual: ShadowActualOutcome) -> ShadowComparison:
     expected_tools = set(case.minimum_evidence_citation_expectations.required_tools)
     actual_tools = set(actual.evidence_tools)
     covered_tools = expected_tools & actual_tools
+    missing_count = missing_required_evidence_count(
+        case.minimum_evidence_citation_expectations.required_tools,
+        actual.evidence_tools,
+    )
     missing_tools = expected_tools - actual_tools
     coverage = len(covered_tools) / len(expected_tools) if expected_tools else 1.0
     minimum_citations = case.minimum_evidence_citation_expectations.minimum_unique_citations
@@ -131,6 +136,6 @@ def compare(case: ShadowCase, actual: ShadowActualOutcome) -> ShadowComparison:
         entries=entries,
         disagreement_categories=disagreements,
         unsupported_citation_count=actual.unsupported_citation_count,
-        missing_required_evidence_count=len(missing_tools),
+        missing_required_evidence_count=missing_count,
         citation_coverage=coverage,
     )

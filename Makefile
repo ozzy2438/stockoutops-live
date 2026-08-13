@@ -1,7 +1,7 @@
 PYTHON := .venv/bin/python
 PIP := .venv/bin/pip
 
-.PHONY: setup up migrate seed shadow-cases shadow-pilot serve lint test smoke-stub down docker-build
+.PHONY: setup up migrate seed shadow-cases shadow-pilot shadow-intake shadow-exclude shadow-collection serve lint test smoke-stub down docker-build
 
 setup:
 	python3.12 -m venv .venv
@@ -22,6 +22,15 @@ shadow-cases:
 
 shadow-pilot:
 	$(PYTHON) -m stockoutops.shadow.cli
+
+shadow-intake:
+	$(PYTHON) -m stockoutops.shadow.intake --input $(INPUT) --execute false
+
+shadow-exclude:
+	$(PYTHON) -c "from stockoutops.shadow.intake import exclude_main; exclude_main()" --intake-id $(INTAKE_ID) --tenant-id $(TENANT_ID) --reason $(REASON)
+
+shadow-collection:
+	$(PYTHON) -m stockoutops.shadow.collection
 
 serve:
 	$(PYTHON) -m uvicorn stockoutops.app:create_app --factory --host 127.0.0.1 --port 8000

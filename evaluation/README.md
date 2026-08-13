@@ -8,8 +8,8 @@ All evaluation artifacts live here.
 evaluation/
 ├── golden_cases/     # curated cases with expected outcomes (G0 + regression)
 ├── replay/           # G0 historical-replay harness
-├── shadow/           # G1 shadow-mode diffs (agent vs analyst)
-├── uat/              # G2 assisted-operation & operator-study records
+├── shadow/           # G1 shadow-mode diffs and UAT intake readiness
+├── uat/              # templates now; later G2 operator-study records
 └── reports/          # weekly & gate-transition evaluation reports
 ```
 

@@ -15,7 +15,12 @@ from psycopg.types.json import Jsonb
 from stockoutops.database import Database
 from stockoutops.errors import ConflictError, NotFoundError
 from stockoutops.identity import Principal
-from stockoutops.shadow.contracts import ShadowActualOutcome, ShadowComparison
+from stockoutops.shadow.contracts import (
+    BaselineSource,
+    ProvenanceLabel,
+    ShadowActualOutcome,
+    ShadowComparison,
+)
 
 
 def _lock_key(value: str) -> int:
@@ -35,6 +40,8 @@ class ShadowRunRecord:
     processor_version: str
     prompt_version: str
     tool_schema_version: str
+    provenance_label: ProvenanceLabel
+    baseline_source: BaselineSource
     execute: bool
     status: str
     investigation_run_id: UUID | None
@@ -64,6 +71,8 @@ def _record(row: dict[str, Any]) -> ShadowRunRecord:
         processor_version=row["processor_version"],
         prompt_version=row["prompt_version"],
         tool_schema_version=row["tool_schema_version"],
+        provenance_label=row["provenance_label"],
+        baseline_source=row["baseline_source"],
         execute=row["execute"],
         status=row["status"],
         investigation_run_id=row["investigation_run_id"],
@@ -150,6 +159,8 @@ class ShadowRepository:
         case_pack_version: str,
         processor_version: str,
         prompt_version: str,
+        provenance_label: ProvenanceLabel,
+        baseline_source: BaselineSource,
         now: datetime,
     ) -> tuple[ShadowRunRecord, ShadowClaim | None, bool]:
         keys = sorted(
@@ -215,10 +226,10 @@ class ShadowRepository:
                 INSERT INTO shadow_run (
                     shadow_run_id, tenant_id, idempotency_key, payload_hash,
                     case_id, case_version, case_pack_version, processor_version,
-                    prompt_version, tool_schema_version, execute, status,
-                    external_action_count, created_by, created_at
+                    prompt_version, tool_schema_version, provenance_label, baseline_source,
+                    execute, status, external_action_count, created_by, created_at
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, 'v1', false,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, 'v1', %s, %s, false,
                     'started', 0, %s, %s
                 ) RETURNING *
                 """,
@@ -232,6 +243,8 @@ class ShadowRepository:
                     case_pack_version,
                     processor_version,
                     prompt_version,
+                    provenance_label,
+                    baseline_source,
                     principal.actor_id,
                     now,
                 ),
