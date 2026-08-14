@@ -1,6 +1,6 @@
 # 07 — Security, Privacy & Threat Model
 
-> Owner: Honey. Reviewer: Fizz. Status: **Milestone-0 planning baseline; bounded M1 and merged M2 shadow controls plus an M2-04 local alert-policy candidate**. Unresolved production controls remain gated by `13_risks_and_open_decisions.md`. Method: STRIDE per trust boundary, plus AI-specific threat classes.
+> Owner: Honey. Reviewer: Fizz. Status: **Milestone-0 planning baseline; bounded M1 and merged M2 shadow controls plus M2-04 local alert-policy and disabled-by-default webhook adapter candidates**. Unresolved production controls remain gated by `13_risks_and_open_decisions.md`. Method: STRIDE per trust boundary, plus AI-specific threat classes.
 
 ## Trust boundaries
 
@@ -96,11 +96,28 @@ network, model, user-data, or external-delivery boundary.
 |---|---|---|
 | Synthetic evidence represented as SLO attainment | Input accepts only the fixed `SIMULATED` shadow-report label; persisted/output eligibility for live SLO evidence is constrained to false | A later live environment needs separately reviewed measured-input and delivery contracts |
 | Missing signal silently treated as healthy | Absent processing-failure denominator produces `UNMEASURED` with no `OK` state | Production availability, RLS, IdP, cost, and live-model signals remain unwired |
-| Alert spam or concurrent duplication | Stable tenant/policy/correlation fingerprint, transaction advisory lock, idempotency key, and payload hash converge concurrent repeats | No distributed external-delivery deduplication exists because no delivery exists |
+| Alert spam or concurrent duplication | Stable tenant/policy/correlation fingerprint, transaction advisory lock, idempotency key, and payload hash converge concurrent repeats | Delivery deduplication is a separate claim-before-send table when the optional webhook adapter is enabled |
 | Alert cleared without evidence | `FIRING` to `RESOLVED` requires a later evaluated non-breaching window and appends a new event | Engineering test windows are not production burn-rate windows |
 | Evaluation history tampering | Application role cannot update/delete; a database trigger blocks mutation | Migration/admin remains privileged; no WORM or cryptographic tamper-evidence claim |
-| Alert evaluator causes an operational side effect | No sink implementation exists; rows constrain `execute=false` and external delivery count to zero | CloudWatch/SNS/page/email/chat delivery is a future separately authorised task |
+| Alert evaluator causes an operational side effect | Evaluation rows still constrain `execute=false` and external delivery count to zero; the default sink is disabled and performs no network I/O | Live/staging CloudWatch/SNS/page/email/chat adapters remain absent |
 | Shadow execution-safety breach is normalised | `external_action_count > 0` persists a SEV1 `FIRING` event then fails closed | This is local control-path evidence, not a deployed safety alarm |
+
+## M2-04 local HTTPS webhook adapter threat-model diff
+
+Issue #24 adds an optional provider-neutral HTTPS webhook `AlertSink`. Delivery is
+disabled by default. Enabling it requires explicit configuration. Tests use only a
+loopback HTTP receiver. This is not a live/staging delivery proof.
+
+**M2-04 PENDING — no external/staging alert delivery has yet been proven.**
+
+| Threat | Implemented local control | Residual / limit |
+|---|---|---|
+| Accidental outbound delivery | Default sink is disabled; CI `alert-pilot` does not set the enable flag; evaluation rows keep delivery count at zero | An operator who later sets the enable flag in a shared environment could contact a configured URL |
+| Duplicate lifecycle notifications | Claim-before-HTTP unique `(tenant_id, evaluation_id)` plus advisory lock; replay and `STILL_FIRING` do not send | Crash after claim and before POST can drop a notification (at-most-once) |
+| SSRF / credentialed URL | HTTPS required except loopback HTTP; userinfo in the URL is rejected; redirects are disabled | This is not a full SSRF allow-list or network egress proxy |
+| Secret leakage | Optional token is environment-only, sent as `Authorization`, and omitted from payloads, delivery rows, and reports | Process environment inspection remains possible on the local host |
+| Delivery failure hides the alert | Evaluation persist commits before HTTP; timeout is 2s with at most two attempts | Failed delivery is recorded separately; there is no outbox replay worker |
+| Synthetic evidence treated as live SLO | Payload and evaluations remain `SIMULATED` with `live_slo_evidence_eligible=false` | A later measured-input contract is still required before any SLO claim |
 
 ## Diff process
 

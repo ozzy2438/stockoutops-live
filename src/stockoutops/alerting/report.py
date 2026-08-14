@@ -214,14 +214,19 @@ def build_alert_report(
             "Shadow processing failures are UNMEASURED because the current successful report "
             "does not export an attempt/failure denominator.",
             "Deterministic-provider latency remains SIMULATED metadata without an alert rule.",
-            "No external alert sink implementation or delivery mechanism exists.",
-            "M2-03, M2-04 delivery proof, M2-05, and M2-06 remain pending.",
+            "A local HTTPS webhook adapter exists but is disabled by default and "
+            "is not a live/staging delivery proof.",
+            "M2-04 PENDING — no external/staging alert delivery has yet been proven.",
+            "M2-03, M2-05, and M2-06 remain pending.",
         ],
         "m2_status": {
             "M2-01": "DONE — merged engineering foundation",
             "M2-02": "DONE — merged engineering foundation",
             "M2-03": "PENDING — no genuine UAT users/consent",
-            "M2-04": "PENDING — local/CI policy foundation only; no delivered alert",
+            "M2-04": (
+                "PENDING — local webhook adapter candidate only; "
+                "no external/staging alert delivery has yet been proven"
+            ),
             "M2-05": "PENDING — official genuine eligible count remains zero",
             "M2-06": "PENDING — no G1 exit report or Fizz verdict",
         },

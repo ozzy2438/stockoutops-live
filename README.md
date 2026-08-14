@@ -2,7 +2,7 @@
 
 **Human-Supervised AI Decisioning & Reliability Platform**
 
-> **Current implementation status: M1 local slice closed; M2-01/M2-02 and the bounded UAT-readiness bridge merged; M2-03 through M2-06 remain pending.** The local/CI M2-04 alert-policy foundation is an implementation candidate, not delivered alerting. This is not production-ready, production-proven, a current AWS deployment, live UAT, or evidence of model, SLO, or business quality. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
+> **Current implementation status: M1 local slice closed; M2-01/M2-02 and the bounded UAT-readiness bridge merged; M2-03 through M2-06 remain pending.** The local/CI M2-04 alert-policy foundation and disabled-by-default HTTPS webhook adapter are implementation candidates, not delivered alerting. **M2-04 PENDING — no external/staging alert delivery has yet been proven.** This is not production-ready, production-proven, a current AWS deployment, live UAT, or evidence of model, SLO, or business quality. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
 
 StockoutOps Live is the new canonical Phase-2 implementation. The [PharmaRetail AI Control Tower](https://github.com/ozzy2438/PharmaRetail-AI-Control-Tower) is reference material only; useful patterns may be selectively migrated after review, but the old project is not a runtime dependency or a codebase to copy wholesale.
 
@@ -89,9 +89,9 @@ It evaluates a frozen provider-neutral policy set, appends tenant-scoped alert e
 to PostgreSQL, and writes ignored JSON/Markdown reports under `evaluation/reports/`.
 The same fingerprint has one derived active state; advisory locking and request hashes
 make repeated/concurrent evaluation idempotent, while resolution is a new append-only
-event. Missing signals remain `UNMEASURED`, and no alert sink implementation exists.
-This is a local/CI wiring rehearsal only: M2-04 remains pending until a later
-authorised environment delivers and proves real alerts.
+event. Missing signals remain `UNMEASURED`. A generic HTTPS webhook `AlertSink` exists
+but is disabled by default and is not invoked by `make alert-pilot`.
+**M2-04 PENDING — no external/staging alert delivery has yet been proven.**
 
 ---
 

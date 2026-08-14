@@ -1,4 +1,4 @@
-"""Deterministic control service for alert evaluation; it never delivers alerts."""
+"""Deterministic control service for alert evaluation and optional sink delivery."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from stockoutops.alerting.contracts import AlertEvaluation, AlertMetricSnapshot
 from stockoutops.alerting.policies import assess_policies
 from stockoutops.alerting.repository import AlertRepository
+from stockoutops.alerting.sink import AlertSink, DisabledAlertSink
 from stockoutops.errors import AuthorizationError, ConflictError, NotFoundError
 from stockoutops.identity import Principal
 
@@ -18,9 +19,11 @@ class AlertService:
         repository: AlertRepository,
         *,
         clock: Callable[[], datetime] | None = None,
+        sink: AlertSink | None = None,
     ) -> None:
         self.repository = repository
         self.clock = clock or (lambda: datetime.now(UTC))
+        self.sink = sink if sink is not None else DisabledAlertSink()
 
     def evaluate(
         self,
@@ -44,6 +47,7 @@ class AlertService:
                 evaluated_at=self.clock(),
             )
             results.append(evaluation)
+            self.sink.deliver(principal, evaluation)
             if (
                 assessment.policy_id == "shadow-external-action-safety"
                 and evaluation.state == "FIRING"

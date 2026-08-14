@@ -138,7 +138,11 @@ UNWIRED_SIGNALS: tuple[UnwiredSignal, ...] = (
     UnwiredSignal(
         signal="external_alert_delivery",
         status="UNWIRED",
-        reason="CloudWatch/SNS/email/chat/paging adapters are intentionally absent.",
+        reason=(
+            "Live/staging CloudWatch/SNS/email/chat/paging adapters are absent. "
+            "A local HTTPS webhook adapter exists but is disabled by default and "
+            "is not a live/staging delivery proof."
+        ),
     ),
 )
 
