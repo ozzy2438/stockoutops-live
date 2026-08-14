@@ -1,9 +1,9 @@
 # M2 shadow foundation
 
 The implemented candidate is a local/containerised engineering rehearsal over
-controlled-synthetic cases. M2-01 and M2-02 are merged via PR #18. Issue #19 adds
-the UAT/real-shadow readiness bridge; it is not live UAT, the first 100 genuine
-cases, or G1 exit evidence.
+controlled-synthetic cases. M2-01 and M2-02 are merged via PR #18. PR #20 merged
+the Issue #19 UAT/real-shadow readiness bridge; it is not live UAT, the first 100
+genuine cases, or G1 exit evidence.
 
 Every case and persisted shadow run is hard-locked to `execute=false`. The CLI has
 no true mode, the service rejects `execute=true` before persistence or analysis, and
@@ -98,9 +98,10 @@ restricted application DSN for processing/persistence. Local and CI use only
 
 - M2-01 engineering foundation merged (PR #18).
 - M2-02 engineering foundation merged (PR #18).
-- UAT/real-shadow readiness bridge implemented — pending Buzz/Fizz assurance (#19).
+- UAT/real-shadow readiness bridge merged (PR #20); no users or genuine cases exist.
 - M2-03 pending — no users recruited or consent recorded.
-- M2-04 pending — no SLO alerts or compliance evidence.
+- M2-04 pending — Issue #21 is a local/CI policy candidate with no delivered alert
+  or SLO-compliance evidence.
 - M2-05 pending — these 12 cases are not the first 100 genuine shadow cases.
 - M2-06 pending — no G1 exit report, Fizz verdict, or owner completion decision.
 

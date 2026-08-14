@@ -1,7 +1,7 @@
 PYTHON := .venv/bin/python
 PIP := .venv/bin/pip
 
-.PHONY: setup up migrate seed shadow-cases shadow-pilot shadow-intake shadow-exclude shadow-collection serve lint test smoke-stub down docker-build
+.PHONY: setup up migrate seed shadow-cases shadow-pilot shadow-intake shadow-exclude shadow-collection alert-pilot serve lint test smoke-stub down docker-build
 
 setup:
 	python3.12 -m venv .venv
@@ -31,6 +31,9 @@ shadow-exclude:
 
 shadow-collection:
 	$(PYTHON) -m stockoutops.shadow.collection
+
+alert-pilot:
+	$(PYTHON) -m stockoutops.alerting.cli
 
 serve:
 	$(PYTHON) -m uvicorn stockoutops.app:create_app --factory --host 127.0.0.1 --port 8000

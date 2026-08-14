@@ -111,13 +111,19 @@ The former M1-01–M1-10 package is preserved but is not executable M1 authority
 >
 > Issue #19 is authorised only for the UAT / real-shadow readiness bridge:
 > canonical missing-evidence measurement, future genuine-case contract, intake,
-> templates, and first-100 collection tooling. It does not recruit users, wire
+> templates, and first-100 collection tooling. That bounded bridge is merged. It did
+> not recruit users, wire
 > SLO alerts, collect 100 genuine cases, or complete G1.
+>
+> Issue #21 is authorised only for a provider-neutral local/CI alert-policy
+> engineering foundation. It does not deliver an alert, prove an environment, or
+> complete M2-04.
 
 - [x] M2-01 — Shadow processor engineering foundation merged (`execute=false`, PR #18). Not G1 exit.
 - [x] M2-02 — Deterministic diff-report engineering foundation merged (PR #18). Not G1 exit.
 - [ ] M2-03 — UAT user recruitment (≥ 3) + consent forms.
-- [ ] M2-04 — SLO alerts wired.
+- [ ] M2-04 — SLO alerts wired. Local/CI policy-wiring candidate tracked by #21;
+  actual environment delivery and proof remain pending.
 - [ ] M2-05 — First 100 genuine shadow cases analysed; disagreement characterisation.
 - [ ] M2-06 — G1 exit gate report + Fizz `APPROVE`.
 

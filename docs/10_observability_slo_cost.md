@@ -1,6 +1,6 @@
 # 10 — Observability, SLOs & Cost
 
-> Owner: Bumble (build) + Honey (design) + Fizz (assurance). Status: **TARGET plan; M2 adds local report metadata only, with no live SLO evidence, dashboards, or alerts**.
+> Owner: Bumble (build) + Honey (design) + Fizz (assurance). Status: **TARGET plan plus a local/CI M2-04 policy-wiring candidate; no live SLO evidence, dashboard, alert delivery, or SLO attainment claim**.
 
 ## Signals
 
@@ -41,14 +41,19 @@ Append-only log with per-tenant partitioning; integrity-hashed periodically.
 | Unauthorised access | 0 | any | 0 (release-blocker) |
 | Unsupported claim rate | ≤ 2% | 30 days | 2% |
 
-## Alerts
+## Future production-target alerts — UNWIRED
 
-- Any RLS leakage → SEV1, page on-call.
-- Any unauthorised access → SEV1.
-- P95 latency SLO burn > 2x for 15 min → SEV2.
-- Cost per investigation > 2× rolling median for 1h → SEV3 + email.
-- Tool error rate > 5% over 15 min → SEV3.
-- LLM provider error rate > 10% over 5 min → SEV3 + auto-failover to human-only mode.
+- Any RLS leakage → SEV1, page on-call — **TARGET / UNWIRED**.
+- Any unauthorised access → SEV1 — **TARGET / UNWIRED**.
+- P95 latency SLO burn > 2x for 15 min → SEV2 — **TARGET / UNMEASURED**.
+- Cost per investigation > 2× rolling median for 1h → SEV3 + email —
+  **TARGET / UNMEASURED**.
+- Tool error rate > 5% over 15 min → SEV3 — **TARGET / UNWIRED**.
+- LLM provider error rate > 10% over 5 min → SEV3 + human-only fallback —
+  **TARGET / FUTURE**.
+
+These future policies are not implemented by the local M2-04 foundation. It has no
+production RLS, IdP, availability, cost, live-model, page, email, or failover signal.
 
 ### M2 shadow foundation boundary
 
@@ -57,15 +62,43 @@ comparison: case outcome, agreement/disagreement counts, deterministic-provider
 latency metadata, error category, and external-action count. Cost is labelled
 `SIMULATED` or `UNMEASURED`; it is not a production cost measurement.
 
-**M2-04 SLO alerts — PENDING.** No alarm, dashboard, error-budget, SLO attainment,
-or production observability claim is created by the M2-01/M2-02 foundation or by
-the Issue #19 UAT/intake readiness bridge. Local report fields are not alerts.
+**M2-04 SLO alerts — PENDING.** The Issue #21 implementation candidate evaluates
+only current controlled-synthetic shadow-report signals through a provider-neutral
+local/CI policy layer. It persists append-only evaluations and generates local JSON
+and Markdown. It does not create a CloudWatch alarm, deliver a notification, measure
+an error budget, or establish SLO attainment.
 
-Future M2-04 input signals, when a later authorised task wires them, are expected
-to include: shadow agreement/disagreement counts, escalation disagreement,
-missing-required-evidence counts, unsupported-claim counts, `external_action_count`
-(must remain 0), and deterministic-provider latency metadata. Those signals are
-not wired now.
+### Implemented local/CI policy candidate
+
+| Policy | Severity | Trigger | Threshold classification | Current evidence limit |
+|---|---|---:|---|---|
+| Shadow external-action safety | SEV1 | `external_action_count > 0` | **TARGET** | Hard invariant; current rehearsal remains 0 |
+| Escalation disagreement | SEV2 | rate `> 0.20` per tenant report batch | **ENGINEERING TEST THRESHOLD** | Synthetic diff behaviour only |
+| Missing required evidence | SEV3 | count `> 0` | **TARGET** | Contract-derived T1–T3 metric only |
+| Unsupported citation/claim | SEV3 | count `> 0` | **TARGET** | Deterministic citation validation only |
+| Shadow processing errors | SEV3 | rate `> 0.05` per tenant report batch | **ENGINEERING TEST THRESHOLD** | Current successful report lacks an attempt/failure denominator, so it is `UNMEASURED` |
+
+The comparator is strictly greater than: values below or equal to a threshold remain
+`OK`; values above it become `FIRING`. A later non-breaching measured window appends
+`RESOLVED`. A stable fingerprint excludes window values so repeated windows converge
+on one derived active state. PostgreSQL advisory locking plus idempotency and payload
+hashes prevent duplicate effective evaluations; history rejects update/delete through
+application permissions and a database trigger. This is mutation control, not WORM or
+cryptographic tamper evidence.
+
+Synthetic inputs are permanently marked ineligible as live SLO evidence in this
+foundation. Missing metrics produce `UNMEASURED`, never an implicit `OK`. The future
+sink is an interface only; no CloudWatch, SNS, email, chat, or paging adapter exists.
+
+Run after `make shadow-pilot`:
+
+```bash
+make alert-pilot
+```
+
+Disable/rollback by not invoking the CLI and reverting the implementation commit.
+Migration `0006` is additive and forward-only; retain its append-only history for
+inspection. There is no delivered alert to compensate or disable.
 
 ## Dashboards
 
