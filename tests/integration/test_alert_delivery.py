@@ -10,7 +10,7 @@ from pathlib import Path
 import psycopg
 import pytest
 
-from stockoutops.alerting.contracts import AlertCorrelation, AlertMetricSnapshot
+from stockoutops.alerting.contracts import AlertCorrelation, AlertEvaluation, AlertMetricSnapshot
 from stockoutops.alerting.delivery import AlertDeliveryRepository
 from stockoutops.alerting.delivery_settings import AlertDeliverySettings
 from stockoutops.alerting.repository import AlertRepository
@@ -359,6 +359,158 @@ def test_delivery_attempts_are_tenant_scoped(alert_repository: AlertRepository) 
                 payload_hash="d" * 64,
                 claimed_at=datetime(2026, 8, 14, 12, 0, tzinfo=UTC),
             )
+
+
+def _claimed_firing(
+    alert_repository: AlertRepository, prefix: str
+) -> tuple[AlertEvaluation, AlertDeliveryRepository]:
+    service = _service(alert_repository, DisabledAlertSink())
+    results = service.evaluate(_principal(), _firing_snapshot(), idempotency_prefix=prefix)
+    firing = next(item for item in results if item.transition == "FIRED")
+    delivery = AlertDeliveryRepository(Database(APP_DSN))
+    claimed = delivery.claim(
+        _principal(),
+        firing,
+        destination_host="127.0.0.1",
+        payload_hash="e" * 64,
+        claimed_at=datetime(2026, 8, 14, 12, 0, tzinfo=UTC),
+    )
+    assert claimed is True
+    rows = delivery.attempts(_principal(), firing.evaluation_id)
+    assert len(rows) == 1
+    assert rows[0]["status"] == "CLAIMED"
+    return firing, delivery
+
+
+@pytest.mark.integration
+def test_claimed_to_delivered_complete_is_accepted(
+    alert_repository: AlertRepository,
+) -> None:
+    firing, delivery = _claimed_firing(alert_repository, "guard-delivered")
+    delivery.complete(
+        _principal(),
+        firing,
+        status="DELIVERED",
+        attempt_count=1,
+        http_status=200,
+        error_class=None,
+        completed_at=datetime(2026, 8, 14, 12, 1, tzinfo=UTC),
+    )
+    row = delivery.attempts(_principal(), firing.evaluation_id)[0]
+    assert row["status"] == "DELIVERED"
+    assert row["attempt_count"] == 1
+    assert row["http_status"] == 200
+    assert row["tenant_id"] == "t_alpha"
+    assert row["payload_hash"] == "e" * 64
+
+
+@pytest.mark.integration
+def test_claimed_to_failed_complete_is_accepted(
+    alert_repository: AlertRepository,
+) -> None:
+    firing, delivery = _claimed_firing(alert_repository, "guard-failed")
+    delivery.complete(
+        _principal(),
+        firing,
+        status="FAILED",
+        attempt_count=2,
+        http_status=None,
+        error_class="timeout",
+        completed_at=datetime(2026, 8, 14, 12, 1, tzinfo=UTC),
+    )
+    row = delivery.attempts(_principal(), firing.evaluation_id)[0]
+    assert row["status"] == "FAILED"
+    assert row["attempt_count"] == 2
+    assert row["error_class"] == "timeout"
+    assert row["alert_fingerprint"] == firing.alert_fingerprint
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [
+        ("tenant_id", "'t_evil'"),
+        ("evaluation_id", "999999"),
+        ("alert_fingerprint", "'" + "b" * 64 + "'"),
+        ("transition", "'RESOLVED'"),
+        ("destination_host", "'evil.example'"),
+        ("payload_hash", "'" + "c" * 64 + "'"),
+        ("claimed_at", "'2020-01-01T00:00:00+00'"),
+    ],
+)
+def test_delivery_identity_fields_are_immutable(
+    alert_repository: AlertRepository, column: str, value: str
+) -> None:
+    _claimed_firing(alert_repository, f"guard-immutable-{column}")
+    sql = (
+        "UPDATE alert_delivery_attempt SET status = 'DELIVERED', "
+        f"attempt_count = 1, completed_at = now(), {column} = {value}"
+    )
+    for dsn in (ADMIN_DSN, APP_DSN):
+        with psycopg.connect(dsn) as connection, pytest.raises(psycopg.Error):
+            connection.execute(sql)
+
+
+@pytest.mark.integration
+def test_delivered_cannot_become_failed(alert_repository: AlertRepository) -> None:
+    firing, delivery = _claimed_firing(alert_repository, "guard-delivered-to-failed")
+    delivery.complete(
+        _principal(),
+        firing,
+        status="DELIVERED",
+        attempt_count=1,
+        http_status=200,
+        error_class=None,
+        completed_at=datetime(2026, 8, 14, 12, 1, tzinfo=UTC),
+    )
+    for dsn in (ADMIN_DSN, APP_DSN):
+        with psycopg.connect(dsn) as connection, pytest.raises(psycopg.Error):
+            connection.execute("UPDATE alert_delivery_attempt SET status = 'FAILED'")
+
+
+@pytest.mark.integration
+def test_failed_cannot_become_delivered(alert_repository: AlertRepository) -> None:
+    firing, delivery = _claimed_firing(alert_repository, "guard-failed-to-delivered")
+    delivery.complete(
+        _principal(),
+        firing,
+        status="FAILED",
+        attempt_count=2,
+        http_status=None,
+        error_class="connection_error",
+        completed_at=datetime(2026, 8, 14, 12, 1, tzinfo=UTC),
+    )
+    for dsn in (ADMIN_DSN, APP_DSN):
+        with psycopg.connect(dsn) as connection, pytest.raises(psycopg.Error):
+            connection.execute("UPDATE alert_delivery_attempt SET status = 'DELIVERED'")
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "UPDATE alert_delivery_attempt SET attempt_count = 2",
+        "UPDATE alert_delivery_attempt SET http_status = 500",
+        "UPDATE alert_delivery_attempt SET error_class = 'rewritten'",
+        "UPDATE alert_delivery_attempt SET completed_at = '2020-01-01T00:00:00+00'",
+    ],
+)
+def test_terminal_delivery_metadata_cannot_be_rewritten(
+    alert_repository: AlertRepository, sql: str
+) -> None:
+    firing, delivery = _claimed_firing(alert_repository, f"guard-terminal-meta-{sql[:24]}")
+    delivery.complete(
+        _principal(),
+        firing,
+        status="DELIVERED",
+        attempt_count=1,
+        http_status=200,
+        error_class=None,
+        completed_at=datetime(2026, 8, 14, 12, 1, tzinfo=UTC),
+    )
+    for dsn in (ADMIN_DSN, APP_DSN):
+        with psycopg.connect(dsn) as connection, pytest.raises(psycopg.Error):
+            connection.execute(sql)
 
 
 @pytest.mark.integration

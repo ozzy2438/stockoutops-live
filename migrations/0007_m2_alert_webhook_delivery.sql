@@ -34,6 +34,39 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION guard_alert_delivery_attempt_update()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF OLD.status IN ('DELIVERED', 'FAILED') THEN
+        RAISE EXCEPTION 'alert_delivery_attempt terminal row cannot be modified'
+            USING ERRCODE = '55000';
+    END IF;
+
+    IF OLD.status IS DISTINCT FROM 'CLAIMED'
+       OR NEW.status NOT IN ('DELIVERED', 'FAILED') THEN
+        RAISE EXCEPTION
+            'alert_delivery_attempt status may only change from CLAIMED to DELIVERED or FAILED'
+            USING ERRCODE = '55000';
+    END IF;
+
+    IF NEW.delivery_attempt_id IS DISTINCT FROM OLD.delivery_attempt_id
+       OR NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
+       OR NEW.evaluation_id IS DISTINCT FROM OLD.evaluation_id
+       OR NEW.alert_fingerprint IS DISTINCT FROM OLD.alert_fingerprint
+       OR NEW.transition IS DISTINCT FROM OLD.transition
+       OR NEW.destination_host IS DISTINCT FROM OLD.destination_host
+       OR NEW.payload_hash IS DISTINCT FROM OLD.payload_hash
+       OR NEW.claimed_at IS DISTINCT FROM OLD.claimed_at THEN
+        RAISE EXCEPTION 'alert_delivery_attempt identity fields are immutable'
+            USING ERRCODE = '55000';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -48,6 +81,27 @@ BEGIN
 END;
 $$;
 
-GRANT SELECT, INSERT, UPDATE ON alert_delivery_attempt TO stockoutops_app;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'alert_delivery_attempt_guard_update'
+          AND tgrelid = 'alert_delivery_attempt'::regclass
+    ) THEN
+        CREATE TRIGGER alert_delivery_attempt_guard_update
+        BEFORE UPDATE ON alert_delivery_attempt
+        FOR EACH ROW EXECUTE FUNCTION guard_alert_delivery_attempt_update();
+    END IF;
+END;
+$$;
+
+GRANT SELECT, INSERT ON alert_delivery_attempt TO stockoutops_app;
+GRANT UPDATE (
+    status, attempt_count, http_status, error_class, completed_at
+) ON alert_delivery_attempt TO stockoutops_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO stockoutops_app;
 REVOKE DELETE ON alert_delivery_attempt FROM stockoutops_app;
+REVOKE UPDATE (
+    tenant_id, evaluation_id, alert_fingerprint, transition, destination_host,
+    payload_hash, claimed_at, delivery_attempt_id
+) ON alert_delivery_attempt FROM stockoutops_app;
