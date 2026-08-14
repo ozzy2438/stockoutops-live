@@ -79,6 +79,9 @@ external write integration.
 | Duplicate concurrent processing | Fixed-order advisory locks cover idempotency and case identity; M1 idempotency preserves one analysis/reasoning invocation | Crash recovery retains M1's existing manual-inspection limitation for abandoned tool calls |
 | Result/audit mutation | One controlled `started` → terminal update; terminal shadow runs, diffs, and control events reject update/delete through privileges and triggers | Migration/admin role remains privileged in the local test environment |
 | Synthetic evidence misrepresented as live quality | Fixed report title and `SIMULATED` / `controlled_synthetic_reference` labels; M2-03 through M2-06 remain pending | Human governance review is still required before publication or promotion |
+| Genuine UAT case or consent leakage | Intake accepts only de-identified JSON with opaque `OFFLINE-CONSENT-*` references; signed consent is forbidden in git and in `case_json`; synthetic cases cannot enter official M2-05 | Owner/Scout still have to enforce offline storage and recruitment process |
+| Intake duplicate or payload substitution | Tenant+case+version uniqueness, payload hash, conflict event, and advisory lock | Local application-role SELECT is not production RLS |
+| Intake mistaken for execution | Intake persists shadow-only rows, cannot set `execute=true`, and does not call the processor, model, or any external action | Later authorised processing remains a separate step |
 
 The fixture seeder requires the migration/admin role and is local test tooling only.
 The processor itself uses the restricted application role and the deterministic stub.

@@ -1,8 +1,9 @@
 # M2 shadow foundation
 
 The implemented candidate is a local/containerised engineering rehearsal over
-controlled-synthetic cases. It prepares M2-01 and M2-02 foundations; it is not the
-future live-UAT Gate 1 dataset or exit report.
+controlled-synthetic cases. M2-01 and M2-02 are merged via PR #18. Issue #19 adds
+the UAT/real-shadow readiness bridge; it is not live UAT, the first 100 genuine
+cases, or G1 exit evidence.
 
 Every case and persisted shadow run is hard-locked to `execute=false`. The CLI has
 no true mode, the service rejects `execute=true` before persistence or analysis, and
@@ -15,13 +16,23 @@ path.
 `cases/v1/cases.json` is pinned by `cases/v1/manifest.json`. The strict contract
 records case/version, tenant, injected `as_of_timestamp`, M1 request, fixture facts,
 reference outcome and escalation, minimum evidence/citation expectations,
-provenance, notes, and limitations. The only current baseline and provenance labels
-are:
+provenance, de-identification status, consent/data-use status, notes, and
+limitations. The committed 12-case pack remains:
 
 - `controlled_synthetic_reference`
 - `SIMULATED`
+- `deidentification_status = not_applicable_controlled_synthetic`
 
-No case is labelled analyst, real, live UAT, or production evidence.
+Future genuine de-identified cases may use `analyst_reference` /
+`GENUINE_UAT_ANALYST_LABELLED` with an opaque offline consent reference. No such
+record is committed in this pack.
+
+## Missing required evidence
+
+See `METRICS.md`. The canonical count is the number of case-specific
+`required_tools` absent from actual evidence. Unused T1/T2/T3 slots are not
+counted. `actual` and comparison/aggregate metrics share this definition.
+Historical three-tool-slot `actual` values remain historical.
 
 ## Processing and persistence
 
@@ -58,7 +69,16 @@ immutable-date convention in `/Users/osmanorka/.buzz/OUTBOX/`.
 make migrate
 make shadow-cases
 make shadow-pilot
+make shadow-collection
 ```
+
+Genuine UAT import, when owner-approved de-identified JSON exists later:
+
+```bash
+make shadow-intake INPUT=path/to/intake.json
+```
+
+Intake does not run analysis. The committed tree contains no genuine intake file.
 
 The pilot requires the migration/admin DSN only to seed controlled fixtures and the
 restricted application DSN for processing/persistence. Local and CI use only
@@ -68,16 +88,17 @@ restricted application DSN for processing/persistence. Local and CI use only
 
 - Retry with the same case/version/processor identity. The advisory lock serialises
   an active peer; a durable `started` row resumes through M1's existing idempotency.
-- Disable by not invoking `stockoutops-shadow-pilot`; no long-running consumer or
-  external integration exists.
-- Code rollback is a revert of the implementation commit. Migration 0004 is additive
-  and forward-only; retain immutable shadow evidence for inspection rather than
-  using a destructive down migration.
+- Disable by not invoking `stockoutops-shadow-pilot` or intake/collection CLIs; no
+  long-running consumer or external integration exists.
+- Code rollback is a revert of the implementation commit. Migrations 0004 and 0005
+  are additive and forward-only; retain immutable shadow evidence for inspection
+  rather than using a destructive down migration.
 
 ## Honest status and handoff
 
-- M2-01 engineering foundation implemented — pending Buzz/Fizz assurance.
-- M2-02 engineering foundation implemented — pending Buzz/Fizz assurance.
+- M2-01 engineering foundation merged (PR #18).
+- M2-02 engineering foundation merged (PR #18).
+- UAT/real-shadow readiness bridge implemented — pending Buzz/Fizz assurance (#19).
 - M2-03 pending — no users recruited or consent recorded.
 - M2-04 pending — no SLO alerts or compliance evidence.
 - M2-05 pending — these 12 cases are not the first 100 genuine shadow cases.

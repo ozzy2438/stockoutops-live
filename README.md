@@ -70,6 +70,7 @@ After `make migrate`, run:
 ```bash
 make shadow-cases
 make shadow-pilot
+make shadow-collection
 ```
 
 The pilot verifies and seeds the versioned controlled-synthetic pack under
@@ -77,8 +78,10 @@ The pilot verifies and seeds the versioned controlled-synthetic pack under
 JSON plus aggregate JSON/Markdown under ignored `evaluation/reports/` paths. These
 artefacts are labelled **M2 SHADOW FOUNDATION — SIMULATED ENGINEERING REHEARSAL**.
 They are not genuine analyst, UAT, production, model-quality, or G1-exit evidence.
-See `evaluation/shadow/README.md` for persistence, report, recovery, rollback, and
-current M2 limitations.
+
+Issue #19 prepares genuine UAT intake and first-100 collection tooling. Synthetic
+cases cannot count toward M2-05. No users have been recruited. See
+`evaluation/shadow/README.md` and `evaluation/uat/OWNER_SCOUT_ACTION_REQUIRED.md`.
 
 ---
 

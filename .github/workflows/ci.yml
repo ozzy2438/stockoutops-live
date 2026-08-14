@@ -99,6 +99,8 @@ jobs:
             --git-sha "$GITHUB_SHA" \
             --test-evidence "MEASURED — full pytest completed earlier in this exact CI job."
           python -c "import json; from pathlib import Path; report = json.loads(Path('evaluation/reports/m2-shadow-foundation-pilot.json').read_text()); assert report['controls']['execute'] is False; assert report['controls']['external_action_count'] == 0; assert report['case_pack']['case_count'] >= 12; print(report['metrics'])"
+          python -m stockoutops.shadow.collection --git-sha "$GITHUB_SHA"
+          python -c "import json; from pathlib import Path; report = json.loads(Path('evaluation/reports/m2-first-100-readiness.json').read_text()); assert report['official_m2_05']['eligible_count'] == 0; assert report['official_m2_05']['synthetic_contribution'] == 0; assert report['simulated']['case_count'] >= 12; assert report['controls']['execute'] is False; print(report['official_m2_05'])"
       - name: Scan tracked files for common live credential patterns
         run: |
           if git grep -nE '(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16})' -- .; then

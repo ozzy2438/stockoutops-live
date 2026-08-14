@@ -61,6 +61,7 @@ def test_migration_is_recorded_and_repeat_is_noop(postgres_schema) -> None:
             row[0] for row in connection.execute("SELECT version FROM schema_migration").fetchall()
         }
     assert "0004_m2_shadow_foundation.sql" in versions
+    assert "0005_m2_uat_shadow_intake.sql" in versions
     assert (
         run_migrations(
             ADMIN_DSN,
@@ -118,6 +119,24 @@ def test_shadow_run_is_durable_idempotent_and_restart_safe(
     assert _count("review_decision") == 0
     assert first.actual.execute is False
     assert first.actual.external_action_count == 0
+
+
+@pytest.mark.integration
+def test_missing_required_evidence_uses_case_required_tools(
+    shadow_service: ShadowService, loaded_pack
+) -> None:
+    case = next(item for item in loaded_pack.pack.cases if item.case_id == "m2-missing-demand-008")
+    result = shadow_service.process(
+        _principal(case.tenant_id),
+        case,
+        case_pack_version=loaded_pack.pack.case_pack_version,
+        idempotency_key="shadow-canonical-missing-evidence",
+    )
+    assert set(case.minimum_evidence_citation_expectations.required_tools) == {"T1_inventory"}
+    assert result.actual.evidence_tools == ["T1_inventory"]
+    assert result.actual.missing_required_evidence_count == 0
+    assert result.comparison.missing_required_evidence_count == 0
+    assert max(0, 3 - len(set(result.actual.evidence_tools))) == 2
 
 
 @pytest.mark.integration

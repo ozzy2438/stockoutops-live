@@ -130,11 +130,13 @@ def aggregate_report(
             "All cases and reference outcomes are controlled synthetic fixtures.",
             "No genuine analyst decisions, UAT users, live stockout cases, or model call exist.",
             "Synthetic agreement cannot establish reasoning quality or operational reliability.",
+            "missing_required_evidence_count uses each case's required_tools set; "
+            "see evaluation/shadow/METRICS.md.",
             "M2-04 SLO alerts are pending; no SLO compliance is claimed.",
         ],
         "m2_status": {
-            "M2-01": "engineering foundation implemented — pending Buzz/Fizz assurance",
-            "M2-02": "engineering foundation implemented — pending Buzz/Fizz assurance",
+            "M2-01": "merged engineering foundation (PR #18)",
+            "M2-02": "merged engineering foundation (PR #18)",
             "M2-03": "PENDING — no users recruited",
             "M2-04": "PENDING — no SLO alerts",
             "M2-05": "PENDING — no first 100 genuine shadow cases",

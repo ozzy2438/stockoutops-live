@@ -18,10 +18,11 @@ from stockoutops.shadow.contracts import (
     ShadowResult,
 )
 from stockoutops.shadow.diff import compare
+from stockoutops.shadow.metrics import missing_required_evidence_count
 from stockoutops.shadow.repository import ShadowRepository, ShadowRunRecord
 from stockoutops.state_machine import RunState
 
-PROCESSOR_VERSION = "m2-shadow-processor-v1"
+PROCESSOR_VERSION = "m2-shadow-processor-v1.1"
 PROMPT_VERSION = "m1-bounded-reasoning-v1"
 TOOL_SCHEMA_VERSION = "v1"
 
@@ -58,8 +59,8 @@ class ShadowService:
             processor_version=run.processor_version,
             prompt_version=run.prompt_version,
             tool_schema_version="v1",
-            provenance_label="SIMULATED",
-            baseline_source="controlled_synthetic_reference",
+            provenance_label=run.provenance_label,
+            baseline_source=run.baseline_source,
             output_hash=run.output_hash,
             diff_hash=run.diff_hash,
             actual=ShadowActualOutcome.model_validate(run.output_json),
@@ -114,6 +115,8 @@ class ShadowService:
             case_pack_version=case_pack_version,
             processor_version=PROCESSOR_VERSION,
             prompt_version=PROMPT_VERSION,
+            provenance_label=case.provenance_label,
+            baseline_source=case.baseline_source,
             now=self.clock(),
         )
         if claim is None:
@@ -126,8 +129,13 @@ class ShadowService:
                 idempotency_key=f"shadow:{run.shadow_run_id}",
                 run_mode="shadow",
             )
-            actual = self._actual(principal, investigation.run_id)
+            actual = self._actual(principal, investigation.run_id, case=case)
             comparison = compare(case, actual)
+            if actual.missing_required_evidence_count != comparison.missing_required_evidence_count:
+                raise RuntimeError(
+                    "Canonical missing-required-evidence counts diverged between "
+                    "actual and comparison"
+                )
             output_hash = canonical_hash(actual.model_dump(mode="json"))
             diff_hash = canonical_hash(comparison.model_dump(mode="json"))
             completed = self.repository.complete(
@@ -142,7 +150,13 @@ class ShadowService:
             )
         return self._result_from_record(completed, replay=False)
 
-    def _actual(self, principal: Principal, investigation_run_id: UUID) -> ShadowActualOutcome:
+    def _actual(
+        self,
+        principal: Principal,
+        investigation_run_id: UUID,
+        *,
+        case: ShadowCase,
+    ) -> ShadowActualOutcome:
         detail = self.investigation_service.detail(principal, investigation_run_id)
         audit = self.investigation_service.audit(principal, investigation_run_id)
         evidence = detail["evidence"]
@@ -199,7 +213,10 @@ class ShadowService:
             evidence_ids=evidence_ids,
             citation_ids=citation_ids,
             unsupported_citation_count=unsupported,
-            missing_required_evidence_count=max(0, 3 - len(set(evidence_tools))),
+            missing_required_evidence_count=missing_required_evidence_count(
+                case.minimum_evidence_citation_expectations.required_tools,
+                evidence_tools,
+            ),
             citation_coverage=(
                 len(set(citation_ids) & evidence_id_set) / len(evidence_id_set)
                 if evidence_id_set

@@ -1,4 +1,4 @@
-"""Strict contracts for controlled-synthetic M2 shadow cases and results."""
+"""Strict contracts for M2 shadow cases, including future genuine UAT intake."""
 
 from __future__ import annotations
 
@@ -6,13 +6,25 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from stockoutops.schemas import IntakeRequest
 
 ToolName = Literal["T1_inventory", "T2_sales_demand", "T3_supplier"]
 ExpectedState = Literal["awaiting_human", "escalated"]
 Agreement = Literal["exact", "partial", "disagree"]
+ProvenanceLabel = Literal["SIMULATED", "GENUINE_UAT_ANALYST_LABELLED"]
+BaselineSource = Literal["controlled_synthetic_reference", "analyst_reference"]
+DeidentificationStatus = Literal[
+    "not_applicable_controlled_synthetic",
+    "deidentified_owner_attested",
+]
+ConsentDataUseStatus = Literal[
+    "not_applicable_controlled_synthetic",
+    "owner_attested_consent_held_offline",
+]
+CaseContractVersion = Literal["m2-shadow-case-contract-v2"]
+CONSENT_REFERENCE_PATTERN = r"^OFFLINE-CONSENT-[A-Z0-9-]{8,64}$"
 
 
 class StrictModel(BaseModel):
@@ -76,7 +88,7 @@ class ReferenceEscalation(StrictModel):
 
 
 class MinimumEvidenceExpectation(StrictModel):
-    required_tools: list[ToolName]
+    required_tools: list[ToolName] = Field(min_length=1)
     minimum_unique_citations: int = Field(ge=0, le=3)
 
     @model_validator(mode="after")
@@ -89,19 +101,30 @@ class MinimumEvidenceExpectation(StrictModel):
 class ShadowCase(StrictModel):
     case_id: str = Field(min_length=1, max_length=100)
     case_version: str = Field(pattern=r"^v[1-9][0-9]*$")
+    case_contract_version: CaseContractVersion = "m2-shadow-case-contract-v2"
     category: str = Field(min_length=1, max_length=80)
     tenant_id: Literal["t_alpha", "t_beta"]
     as_of_timestamp: datetime
     execute: Literal[False]
     input: IntakeRequest
-    baseline_source: Literal["controlled_synthetic_reference"]
+    baseline_source: BaselineSource = "controlled_synthetic_reference"
     reference_outcome: ReferenceOutcome
     reference_escalation_expectation: ReferenceEscalation
     minimum_evidence_citation_expectations: MinimumEvidenceExpectation
-    provenance_label: Literal["SIMULATED"]
+    provenance_label: ProvenanceLabel = "SIMULATED"
+    deidentification_status: DeidentificationStatus = "not_applicable_controlled_synthetic"
+    consent_data_use_status: ConsentDataUseStatus = "not_applicable_controlled_synthetic"
+    consent_data_use_reference: str | None = Field(default=None, pattern=CONSENT_REFERENCE_PATTERN)
     fixture_setup: FixtureSetup
     notes: str = Field(min_length=1, max_length=1000)
     limitations: list[str] = Field(min_length=1)
+
+    @field_validator("consent_data_use_reference", mode="before")
+    @classmethod
+    def empty_consent_reference_is_none(cls, value: object) -> object:
+        if value == "":
+            return None
+        return value
 
     @model_validator(mode="after")
     def validate_case(self) -> ShadowCase:
@@ -122,6 +145,27 @@ class ShadowCase(StrictModel):
             )
         ):
             raise ValueError("Escalated references cannot include a recommendation draft")
+        synthetic = self.provenance_label == "SIMULATED"
+        if synthetic:
+            if self.baseline_source != "controlled_synthetic_reference":
+                raise ValueError("SIMULATED cases require controlled_synthetic_reference")
+            if self.deidentification_status != "not_applicable_controlled_synthetic":
+                raise ValueError("SIMULATED cases cannot carry a genuine de-identification status")
+            if self.consent_data_use_status != "not_applicable_controlled_synthetic":
+                raise ValueError("SIMULATED cases cannot carry a genuine consent status")
+            if self.consent_data_use_reference is not None:
+                raise ValueError("SIMULATED cases cannot carry a consent/data-use reference")
+        else:
+            if self.baseline_source != "analyst_reference":
+                raise ValueError("Genuine UAT cases require baseline_source=analyst_reference")
+            if self.deidentification_status != "deidentified_owner_attested":
+                raise ValueError("Genuine UAT cases require owner-attested de-identification")
+            if self.consent_data_use_status != "owner_attested_consent_held_offline":
+                raise ValueError("Genuine UAT cases require offline owner-attested consent status")
+            if self.consent_data_use_reference is None:
+                raise ValueError(
+                    "Genuine UAT cases require an opaque offline consent/data-use reference"
+                )
         return self
 
 
@@ -139,6 +183,12 @@ class ShadowCasePack(StrictModel):
             raise ValueError("Case IDs and versions must be unique within a pack")
         if len({case.category for case in self.cases}) < 4:
             raise ValueError("The controlled-synthetic pack requires at least four categories")
+        if any(case.provenance_label != "SIMULATED" for case in self.cases):
+            raise ValueError("The controlled-synthetic pack cannot contain genuine UAT cases")
+        if any(case.baseline_source != "controlled_synthetic_reference" for case in self.cases):
+            raise ValueError(
+                "The controlled-synthetic pack cannot contain analyst_reference baselines"
+            )
         return self
 
 
@@ -192,10 +242,30 @@ class ShadowResult(StrictModel):
     processor_version: str
     prompt_version: str
     tool_schema_version: Literal["v1"]
-    provenance_label: Literal["SIMULATED"]
-    baseline_source: Literal["controlled_synthetic_reference"]
+    provenance_label: ProvenanceLabel
+    baseline_source: BaselineSource
     output_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     diff_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     actual: ShadowActualOutcome
     comparison: ShadowComparison
     idempotent_replay: bool
+
+
+class ShadowIntakeDocument(StrictModel):
+    intake_document_version: Literal["m2-uat-intake-v1"]
+    execute: Literal[False]
+    cases: list[ShadowCase] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_genuine_intake(self) -> ShadowIntakeDocument:
+        identities = [(case.case_id, case.case_version, case.tenant_id) for case in self.cases]
+        if len(identities) != len(set(identities)):
+            raise ValueError("Intake document contains duplicate case identities")
+        for case in self.cases:
+            if case.provenance_label != "GENUINE_UAT_ANALYST_LABELLED":
+                raise ValueError("Genuine UAT intake rejects SIMULATED cases")
+            if case.baseline_source != "analyst_reference":
+                raise ValueError("Genuine UAT intake requires analyst_reference baselines")
+            if case.execute is not False:
+                raise ValueError("Genuine UAT intake is hard-locked to execute=false")
+        return self

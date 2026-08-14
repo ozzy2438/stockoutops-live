@@ -106,15 +106,19 @@ The former M1-01–M1-10 package is preserved but is not executable M1 authority
 
 ## Milestone 2 — Shadow Mode (G1)
 
-> Issue #17 is authorised only for the local M2-01/M2-02 engineering foundation.
-> The controlled-synthetic pilot is not live UAT or G1 exit evidence. Foundation
-> implementation remains pending Buzz/Fizz assurance and owner merge decision.
+> Issue #17 delivered the merged M2-01/M2-02 engineering foundation (PR #18).
+> That issue remains open because M2/G1 is not complete.
+>
+> Issue #19 is authorised only for the UAT / real-shadow readiness bridge:
+> canonical missing-evidence measurement, future genuine-case contract, intake,
+> templates, and first-100 collection tooling. It does not recruit users, wire
+> SLO alerts, collect 100 genuine cases, or complete G1.
 
-- [ ] M2-01 — Shadow processor engineering foundation implemented (`execute=false`) — pending Buzz/Fizz assurance.
-- [ ] M2-02 — Deterministic diff-report engineering foundation implemented — pending Buzz/Fizz assurance.
+- [x] M2-01 — Shadow processor engineering foundation merged (`execute=false`, PR #18). Not G1 exit.
+- [x] M2-02 — Deterministic diff-report engineering foundation merged (PR #18). Not G1 exit.
 - [ ] M2-03 — UAT user recruitment (≥ 3) + consent forms.
 - [ ] M2-04 — SLO alerts wired.
-- [ ] M2-05 — First 100 shadow cases analysed; disagreement characterisation.
+- [ ] M2-05 — First 100 genuine shadow cases analysed; disagreement characterisation.
 - [ ] M2-06 — G1 exit gate report + Fizz `APPROVE`.
 
 ## Milestone 3 — Assisted Operation (G2)
