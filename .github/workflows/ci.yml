@@ -99,6 +99,9 @@ jobs:
             --git-sha "$GITHUB_SHA" \
             --test-evidence "MEASURED — full pytest completed earlier in this exact CI job."
           python -c "import json; from pathlib import Path; report = json.loads(Path('evaluation/reports/m2-shadow-foundation-pilot.json').read_text()); assert report['controls']['execute'] is False; assert report['controls']['external_action_count'] == 0; assert report['case_pack']['case_count'] >= 12; print(report['metrics'])"
+          python -m stockoutops.alerting.cli --git-sha "$GITHUB_SHA"
+          python -m stockoutops.alerting.cli --git-sha "$GITHUB_SHA"
+          python -c "import json; from pathlib import Path; report = json.loads(Path('evaluation/reports/m2-slo-alert-foundation.json').read_text()); assert report['controls']['execute'] is False; assert report['controls']['external_action_count'] == 0; assert report['controls']['external_alert_delivery_count'] == 0; assert report['controls']['live_slo_evidence_eligible'] is False; assert report['summary']['evaluation_count'] == 10; assert report['summary']['idempotent_replay_count'] == 10; assert report['summary']['measurement_status_counts']['UNMEASURED'] == 2; assert report['m2_status']['M2-04'].startswith('PENDING'); print(report['summary'])"
           python -m stockoutops.shadow.collection --git-sha "$GITHUB_SHA"
           python -c "import json; from pathlib import Path; report = json.loads(Path('evaluation/reports/m2-first-100-readiness.json').read_text()); assert report['official_m2_05']['eligible_count'] == 0; assert report['official_m2_05']['synthetic_contribution'] == 0; assert report['simulated']['case_count'] >= 12; assert report['controls']['execute'] is False; print(report['official_m2_05'])"
       - name: Scan tracked files for common live credential patterns
