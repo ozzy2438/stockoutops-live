@@ -30,4 +30,4 @@ We use lightweight ADRs (Michael Nygard style) to record decisions that constrai
 - `0004-use-local-postgres-for-m1-state-and-evidence.md` — Accepted for M1; effective after scope-lock merge.
 - `0005-use-local-simulated-identity-for-m1.md` — Accepted for local M1; effective after scope-lock merge.
 - `0006-m2-uat-shadow-intake-boundary.md` — Proposed; genuine-UAT intake and contract-derived missing-evidence metric.
-- `0007-m2-local-alert-policy-contract.md` — Proposed; local/CI alert policies and append-only evaluation state.
+- `0007-m2-local-alert-policy-contract.md` — Accepted 2026-08-14 for the bounded local/CI alert policies and append-only evaluation state; M2-04 stays pending and no external delivery or live SLO is proven.

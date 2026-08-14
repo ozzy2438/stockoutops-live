@@ -1,12 +1,17 @@
 # 0007. Local/CI M2 alert-policy contract and append-only evaluation state
 
-- **Status:** Proposed
+- **Status:** Accepted for the bounded local/CI alert-policy foundation
 - **Date:** 2026-08-14
 - **Owner:** Ozzy / Osman Orka
 - **Design and governance:** Honey / Orchestrator
 - **Assurance:** Fizz
-- **Decision state:** Pending assurance and owner decision; this record does not
-  claim acceptance
+- **Decision state:** Accepted 2026-08-14. Fizz assurance `APPROVE` on reviewed
+  source `c385657326d01dd9122bede7633fcba99ef6406f`; Ozzy owner merge decision
+  executed as merge commit `720d7f1191103b21479f5c733f32082336570045`;
+  post-merge `ci` run `31785973778` `SUCCESS` on that merge commit. Acceptance
+  covers only the local/CI contract recorded here. M2-04 remains **PENDING**,
+  and no external alert delivery, live SLO, M2 or G1 completion, or production
+  readiness is accepted or proven.
 
 ## Context
 
@@ -106,8 +111,9 @@ investigation, live-model provider failures, and external delivery remain explic
 
 ## Recovery and rollback
 
-Stop invoking the local alert CLI and revert PR #22 if the proposed contract is not
-accepted. Migration `0006` is additive and forward-only; retain any append-only
+Stop invoking the local alert CLI and revert merge commit
+`720d7f1191103b21479f5c733f32082336570045` if this accepted contract must later be
+withdrawn. Migration `0006` is additive and forward-only; retain any append-only
 evaluation evidence rather than using a destructive rollback. No external
 compensation is required because the foundation has no delivery or operational
 write.
@@ -115,13 +121,18 @@ write.
 ## Decision ownership and next gate
 
 Ozzy / Osman Orka owns the decision. Honey and Orchestrator own design and
-governance review; Fizz owns independent assurance. This ADR remains `Proposed`
-until the required assurance and owner decision occur. PR #22 must not represent
-consultation, assurance, or acceptance that has not happened.
+governance review; Fizz owns independent assurance. The required assurance and
+owner decision have now occurred, in that order: Fizz `APPROVE` on
+`c385657326d01dd9122bede7633fcba99ef6406f`, the Ozzy owner merge decision
+recorded as `720d7f1191103b21479f5c733f32082336570045`, and post-merge `ci`
+run `31785973778` `SUCCESS`. Acceptance is bounded to the contract recorded in
+this ADR and must not be represented as consultation, assurance, or acceptance
+of anything beyond it. The next gate is the separately authorised decision that
+selects, wires, and proves an external alert backend.
 
 ## Follow-ups
 
-- Driving issue: #21; parent M2 issue: #17.
+- Driving issue: #21, closed 2026-08-14; parent M2 issue: #17, which remains open.
 - M2-04 stays pending after this local/CI foundation.
 - A later, separately authorised decision must select, wire, and prove an external
   alert backend before any live-delivery or SLO claim.
