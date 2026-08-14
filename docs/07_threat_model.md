@@ -1,6 +1,6 @@
 # 07 — Security, Privacy & Threat Model
 
-> Owner: Honey. Reviewer: Fizz. Status: **Milestone-0 planning baseline; bounded M1 local controls implemented and M2 shadow delta pending assurance**. Unresolved production controls remain gated by `13_risks_and_open_decisions.md`. Method: STRIDE per trust boundary, plus AI-specific threat classes.
+> Owner: Honey. Reviewer: Fizz. Status: **Milestone-0 planning baseline; bounded M1 and merged M2 shadow controls plus an M2-04 local alert-policy candidate**. Unresolved production controls remain gated by `13_risks_and_open_decisions.md`. Method: STRIDE per trust boundary, plus AI-specific threat classes.
 
 ## Trust boundaries
 
@@ -85,6 +85,22 @@ external write integration.
 
 The fixture seeder requires the migration/admin role and is local test tooling only.
 The processor itself uses the restricted application role and the deterministic stub.
+
+## M2-04 local alert-policy threat-model diff
+
+Issue #21 adds a provider-neutral deterministic evaluator and local PostgreSQL audit
+history over the existing controlled-synthetic shadow report. It adds no cloud,
+network, model, user-data, or external-delivery boundary.
+
+| Threat | Implemented local control | Residual / limit |
+|---|---|---|
+| Synthetic evidence represented as SLO attainment | Input accepts only the fixed `SIMULATED` shadow-report label; persisted/output eligibility for live SLO evidence is constrained to false | A later live environment needs separately reviewed measured-input and delivery contracts |
+| Missing signal silently treated as healthy | Absent processing-failure denominator produces `UNMEASURED` with no `OK` state | Production availability, RLS, IdP, cost, and live-model signals remain unwired |
+| Alert spam or concurrent duplication | Stable tenant/policy/correlation fingerprint, transaction advisory lock, idempotency key, and payload hash converge concurrent repeats | No distributed external-delivery deduplication exists because no delivery exists |
+| Alert cleared without evidence | `FIRING` to `RESOLVED` requires a later evaluated non-breaching window and appends a new event | Engineering test windows are not production burn-rate windows |
+| Evaluation history tampering | Application role cannot update/delete; a database trigger blocks mutation | Migration/admin remains privileged; no WORM or cryptographic tamper-evidence claim |
+| Alert evaluator causes an operational side effect | No sink implementation exists; rows constrain `execute=false` and external delivery count to zero | CloudWatch/SNS/page/email/chat delivery is a future separately authorised task |
+| Shadow execution-safety breach is normalised | `external_action_count > 0` persists a SEV1 `FIRING` event then fails closed | This is local control-path evidence, not a deployed safety alarm |
 
 ## Diff process
 

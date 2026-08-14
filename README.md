@@ -2,7 +2,7 @@
 
 **Human-Supervised AI Decisioning & Reliability Platform**
 
-> **Current implementation status: M1 local slice closed; M2 execute-false shadow engineering foundation — implementation candidate pending Buzz/Fizz assurance.** This is not production-ready, production-proven, a current AWS deployment, live UAT, or evidence of model or business quality. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
+> **Current implementation status: M1 local slice closed; M2-01/M2-02 and the bounded UAT-readiness bridge merged; M2-03 through M2-06 remain pending.** The local/CI M2-04 alert-policy foundation is an implementation candidate, not delivered alerting. This is not production-ready, production-proven, a current AWS deployment, live UAT, or evidence of model, SLO, or business quality. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
 
 StockoutOps Live is the new canonical Phase-2 implementation. The [PharmaRetail AI Control Tower](https://github.com/ozzy2438/PharmaRetail-AI-Control-Tower) is reference material only; useful patterns may be selectively migrated after review, but the old project is not a runtime dependency or a codebase to copy wholesale.
 
@@ -71,6 +71,7 @@ After `make migrate`, run:
 make shadow-cases
 make shadow-pilot
 make shadow-collection
+make alert-pilot
 ```
 
 The pilot verifies and seeds the versioned controlled-synthetic pack under
@@ -82,6 +83,15 @@ They are not genuine analyst, UAT, production, model-quality, or G1-exit evidenc
 Issue #19 prepares genuine UAT intake and first-100 collection tooling. Synthetic
 cases cannot count toward M2-05. No users have been recruited. See
 `evaluation/shadow/README.md` and `evaluation/uat/OWNER_SCOUT_ACTION_REQUIRED.md`.
+
+`make alert-pilot` consumes only the generated controlled-synthetic shadow report.
+It evaluates a frozen provider-neutral policy set, appends tenant-scoped alert events
+to PostgreSQL, and writes ignored JSON/Markdown reports under `evaluation/reports/`.
+The same fingerprint has one derived active state; advisory locking and request hashes
+make repeated/concurrent evaluation idempotent, while resolution is a new append-only
+event. Missing signals remain `UNMEASURED`, and no alert sink implementation exists.
+This is a local/CI wiring rehearsal only: M2-04 remains pending until a later
+authorised environment delivers and proves real alerts.
 
 ---
 
@@ -218,7 +228,8 @@ Only `APPROVE` opens a milestone gate. `APPROVE WITH CONDITIONS` pauses merge an
 ├── observability/              # Dashboards, alert rules, SLO defs
 ├── infra/                      # IaC, deployment, secrets scaffolding
 ├── src/stockoutops/            # Bounded M1 application
-│   └── shadow/                 # Execute-false M2 processor/diff foundation
+│   ├── shadow/                 # Execute-false M2 processor/diff foundation
+│   └── alerting/               # Provider-neutral local/CI alert-policy foundation
 ├── migrations/                 # Ordered, forward-only PostgreSQL SQL
 ├── fixtures/v1/                # Hash-manifested simulated T1–T3 fixtures
 ├── tests/                      # Unit and real-PostgreSQL integration tests
