@@ -24,6 +24,25 @@ CREATE TABLE IF NOT EXISTS alert_delivery_attempt (
 CREATE INDEX IF NOT EXISTS alert_delivery_attempt_tenant_eval_idx
     ON alert_delivery_attempt (tenant_id, evaluation_id);
 
+CREATE OR REPLACE FUNCTION guard_alert_delivery_attempt_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.status IS DISTINCT FROM 'CLAIMED'
+       OR NEW.attempt_count IS DISTINCT FROM 0
+       OR NEW.http_status IS NOT NULL
+       OR NEW.error_class IS NOT NULL
+       OR NEW.completed_at IS NOT NULL THEN
+        RAISE EXCEPTION
+            'alert_delivery_attempt must begin as an uncompleted CLAIMED row'
+            USING ERRCODE = '55000';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION reject_alert_delivery_attempt_delete()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -64,6 +83,20 @@ BEGIN
     END IF;
 
     RETURN NEW;
+END;
+$$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger
+        WHERE tgname = 'alert_delivery_attempt_guard_insert'
+          AND tgrelid = 'alert_delivery_attempt'::regclass
+    ) THEN
+        CREATE TRIGGER alert_delivery_attempt_guard_insert
+        BEFORE INSERT ON alert_delivery_attempt
+        FOR EACH ROW EXECUTE FUNCTION guard_alert_delivery_attempt_insert();
+    END IF;
 END;
 $$;
 

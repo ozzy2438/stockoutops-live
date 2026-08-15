@@ -364,9 +364,7 @@ def test_delivery_attempts_are_tenant_scoped(alert_repository: AlertRepository) 
 def _claimed_firing(
     alert_repository: AlertRepository, prefix: str
 ) -> tuple[AlertEvaluation, AlertDeliveryRepository]:
-    service = _service(alert_repository, DisabledAlertSink())
-    results = service.evaluate(_principal(), _firing_snapshot(), idempotency_prefix=prefix)
-    firing = next(item for item in results if item.transition == "FIRED")
+    firing = _firing_without_delivery(alert_repository, prefix)
     delivery = AlertDeliveryRepository(Database(APP_DSN))
     claimed = delivery.claim(
         _principal(),
@@ -380,6 +378,126 @@ def _claimed_firing(
     assert len(rows) == 1
     assert rows[0]["status"] == "CLAIMED"
     return firing, delivery
+
+
+def _firing_without_delivery(alert_repository: AlertRepository, prefix: str) -> AlertEvaluation:
+    service = _service(alert_repository, DisabledAlertSink())
+    results = service.evaluate(_principal(), _firing_snapshot(), idempotency_prefix=prefix)
+    return next(item for item in results if item.transition == "FIRED")
+
+
+def _insert_delivery_attempt_as_app(
+    firing: AlertEvaluation,
+    *,
+    status: str,
+    attempt_count: int,
+    http_status: int | None,
+    error_class: str | None,
+    completed_at: datetime | None,
+) -> None:
+    with psycopg.connect(APP_DSN) as connection:
+        connection.execute(
+            """
+            INSERT INTO alert_delivery_attempt (
+                tenant_id, evaluation_id, alert_fingerprint, transition,
+                destination_host, status, attempt_count, http_status,
+                error_class, payload_hash, claimed_at, completed_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                "t_alpha",
+                firing.evaluation_id,
+                firing.alert_fingerprint,
+                firing.transition,
+                "127.0.0.1",
+                status,
+                attempt_count,
+                http_status,
+                error_class,
+                "f" * 64,
+                datetime(2026, 8, 14, 12, 0, tzinfo=UTC),
+                completed_at,
+            ),
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("status", "http_status", "error_class"),
+    [
+        ("DELIVERED", 200, None),
+        ("FAILED", None, "timeout"),
+    ],
+)
+def test_app_role_cannot_insert_terminal_delivery_attempt(
+    alert_repository: AlertRepository,
+    status: str,
+    http_status: int | None,
+    error_class: str | None,
+) -> None:
+    firing = _firing_without_delivery(alert_repository, f"insert-terminal-{status}")
+    with pytest.raises(psycopg.Error):
+        _insert_delivery_attempt_as_app(
+            firing,
+            status=status,
+            attempt_count=1,
+            http_status=http_status,
+            error_class=error_class,
+            completed_at=datetime(2026, 8, 14, 12, 1, tzinfo=UTC),
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("attempt_count", "http_status", "error_class", "completed_at"),
+    [
+        (1, None, None, None),
+        (0, 200, None, None),
+        (0, None, "timeout", None),
+        (0, None, None, datetime(2026, 8, 14, 12, 1, tzinfo=UTC)),
+    ],
+)
+def test_app_role_cannot_insert_malformed_claimed_delivery_attempt(
+    alert_repository: AlertRepository,
+    attempt_count: int,
+    http_status: int | None,
+    error_class: str | None,
+    completed_at: datetime | None,
+) -> None:
+    firing = _firing_without_delivery(
+        alert_repository,
+        f"insert-malformed-claimed-{attempt_count}-{http_status}-{error_class}-{completed_at}",
+    )
+    with pytest.raises(psycopg.Error):
+        _insert_delivery_attempt_as_app(
+            firing,
+            status="CLAIMED",
+            attempt_count=attempt_count,
+            http_status=http_status,
+            error_class=error_class,
+            completed_at=completed_at,
+        )
+
+
+@pytest.mark.integration
+def test_app_role_can_insert_valid_claimed_delivery_attempt(
+    alert_repository: AlertRepository,
+) -> None:
+    firing = _firing_without_delivery(alert_repository, "insert-valid-claimed")
+    _insert_delivery_attempt_as_app(
+        firing,
+        status="CLAIMED",
+        attempt_count=0,
+        http_status=None,
+        error_class=None,
+        completed_at=None,
+    )
+    row = _delivery_rows()[0]
+    assert row["status"] == "CLAIMED"
+    assert row["attempt_count"] == 0
+    assert row["http_status"] is None
+    assert row["error_class"] is None
+    assert row["completed_at"] is None
 
 
 @pytest.mark.integration
