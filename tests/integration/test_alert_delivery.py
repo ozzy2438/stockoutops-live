@@ -23,6 +23,7 @@ from tests.integration.conftest import ADMIN_DSN, APP_DSN
 from tests.webhook_receiver import RecordingWebhookServer
 
 SECRET_TOKEN = "super-secret-webhook-token-value"
+TERMINAL_AT = datetime(2026, 8, 14, 12, 1, tzinfo=UTC)
 
 
 def _principal(tenant_id: str = "t_alpha") -> Principal:
@@ -386,6 +387,12 @@ def _firing_without_delivery(alert_repository: AlertRepository, prefix: str) -> 
     return next(item for item in results if item.transition == "FIRED")
 
 
+def _initial_ok_without_delivery(alert_repository: AlertRepository, prefix: str) -> AlertEvaluation:
+    service = _service(alert_repository, DisabledAlertSink())
+    results = service.evaluate(_principal(), _snapshot(), idempotency_prefix=prefix)
+    return next(item for item in results if item.transition == "INITIAL_OK")
+
+
 def _insert_delivery_attempt_as_app(
     firing: AlertEvaluation,
     *,
@@ -394,6 +401,9 @@ def _insert_delivery_attempt_as_app(
     http_status: int | None,
     error_class: str | None,
     completed_at: datetime | None,
+    tenant_id: str | None = None,
+    alert_fingerprint: str | None = None,
+    transition: str | None = None,
 ) -> None:
     with psycopg.connect(APP_DSN) as connection:
         connection.execute(
@@ -405,10 +415,10 @@ def _insert_delivery_attempt_as_app(
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
-                "t_alpha",
+                tenant_id if tenant_id is not None else "t_alpha",
                 firing.evaluation_id,
-                firing.alert_fingerprint,
-                firing.transition,
+                (alert_fingerprint if alert_fingerprint is not None else firing.alert_fingerprint),
+                transition if transition is not None else firing.transition,
                 "127.0.0.1",
                 status,
                 attempt_count,
@@ -419,6 +429,41 @@ def _insert_delivery_attempt_as_app(
                 completed_at,
             ),
         )
+
+
+def _complete_delivery_attempt_as_app(
+    firing: AlertEvaluation,
+    *,
+    status: str,
+    attempt_count: int,
+    http_status: int | None,
+    error_class: str | None,
+    completed_at: datetime | None,
+) -> None:
+    """Direct restricted-app-role completion UPDATE, bypassing the repository path."""
+    with psycopg.connect(APP_DSN) as connection:
+        updated = connection.execute(
+            """
+            UPDATE alert_delivery_attempt
+            SET status = %s,
+                attempt_count = %s,
+                http_status = %s,
+                error_class = %s,
+                completed_at = %s
+            WHERE tenant_id = %s AND evaluation_id = %s AND status = 'CLAIMED'
+            RETURNING delivery_attempt_id
+            """,
+            (
+                status,
+                attempt_count,
+                http_status,
+                error_class,
+                completed_at,
+                firing.tenant_id,
+                firing.evaluation_id,
+            ),
+        ).fetchone()
+        assert updated is not None
 
 
 @pytest.mark.integration
@@ -498,6 +543,182 @@ def test_app_role_can_insert_valid_claimed_delivery_attempt(
     assert row["http_status"] is None
     assert row["error_class"] is None
     assert row["completed_at"] is None
+    assert row["tenant_id"] == firing.tenant_id
+    assert row["alert_fingerprint"] == firing.alert_fingerprint
+    assert row["transition"] == firing.transition
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("tenant_id", "alert_fingerprint", "transition"),
+    [
+        ("t_beta", None, None),
+        (None, "b" * 64, None),
+        (None, None, "RESOLVED"),
+    ],
+    ids=["mismatched-tenant", "mismatched-fingerprint", "mismatched-transition"],
+)
+def test_app_role_cannot_insert_delivery_attempt_with_forged_identity(
+    alert_repository: AlertRepository,
+    tenant_id: str | None,
+    alert_fingerprint: str | None,
+    transition: str | None,
+) -> None:
+    """The database, not the repository, must bind delivery identity to the evaluation."""
+    firing = _firing_without_delivery(
+        alert_repository, f"insert-forged-{tenant_id}-{alert_fingerprint}-{transition}"
+    )
+    with pytest.raises(psycopg.Error):
+        _insert_delivery_attempt_as_app(
+            firing,
+            status="CLAIMED",
+            attempt_count=0,
+            http_status=None,
+            error_class=None,
+            completed_at=None,
+            tenant_id=tenant_id,
+            alert_fingerprint=alert_fingerprint,
+            transition=transition,
+        )
+    assert _count_delivery_attempts() == 0
+
+
+@pytest.mark.integration
+def test_app_role_cannot_attach_cross_tenant_delivery_to_non_lifecycle_evaluation(
+    alert_repository: AlertRepository,
+) -> None:
+    """Regression for the reported bypass: a real INITIAL_OK row forged into a t_beta FIRED."""
+    initial_ok = _initial_ok_without_delivery(alert_repository, "insert-cross-tenant-initial-ok")
+    assert initial_ok.tenant_id == "t_alpha"
+    with pytest.raises(psycopg.Error):
+        _insert_delivery_attempt_as_app(
+            initial_ok,
+            status="CLAIMED",
+            attempt_count=0,
+            http_status=None,
+            error_class=None,
+            completed_at=None,
+            tenant_id="t_beta",
+            alert_fingerprint="b" * 64,
+            transition="FIRED",
+        )
+    assert _count_delivery_attempts() == 0
+
+
+@pytest.mark.integration
+def test_app_role_cannot_insert_delivery_attempt_for_unknown_evaluation(
+    alert_repository: AlertRepository,
+) -> None:
+    firing = _firing_without_delivery(alert_repository, "insert-unknown-evaluation")
+    unknown = firing.model_copy(update={"evaluation_id": 999999})
+    with pytest.raises(psycopg.Error):
+        _insert_delivery_attempt_as_app(
+            unknown,
+            status="CLAIMED",
+            attempt_count=0,
+            http_status=None,
+            error_class=None,
+            completed_at=None,
+        )
+    assert _count_delivery_attempts() == 0
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("status", "attempt_count", "http_status", "error_class", "completed_at"),
+    [
+        ("DELIVERED", 0, 200, None, TERMINAL_AT),
+        ("FAILED", 0, None, "timeout", TERMINAL_AT),
+        ("DELIVERED", 1, 200, None, None),
+        ("FAILED", 1, None, "timeout", None),
+        ("DELIVERED", 1, 500, None, TERMINAL_AT),
+        ("DELIVERED", 1, None, None, TERMINAL_AT),
+        ("DELIVERED", 1, 200, "timeout", TERMINAL_AT),
+        ("FAILED", 1, None, None, TERMINAL_AT),
+        ("FAILED", 1, None, "   ", TERMINAL_AT),
+        ("FAILED", 1, 200, "timeout", TERMINAL_AT),
+    ],
+    ids=[
+        "delivered-attempt-count-zero",
+        "failed-attempt-count-zero",
+        "delivered-without-completed-at",
+        "failed-without-completed-at",
+        "delivered-non-2xx",
+        "delivered-without-http-status",
+        "delivered-with-error-class",
+        "failed-without-error-class",
+        "failed-with-blank-error-class",
+        "failed-with-successful-2xx",
+    ],
+)
+def test_app_role_cannot_complete_with_inconsistent_terminal_evidence(
+    alert_repository: AlertRepository,
+    status: str,
+    attempt_count: int,
+    http_status: int | None,
+    error_class: str | None,
+    completed_at: datetime | None,
+) -> None:
+    firing, _ = _claimed_firing(
+        alert_repository,
+        f"terminal-evidence-{status}-{attempt_count}-{http_status}-{error_class}-{completed_at}",
+    )
+    with pytest.raises(psycopg.Error):
+        _complete_delivery_attempt_as_app(
+            firing,
+            status=status,
+            attempt_count=attempt_count,
+            http_status=http_status,
+            error_class=error_class,
+            completed_at=completed_at,
+        )
+    row = _delivery_rows()[0]
+    assert row["status"] == "CLAIMED"
+    assert row["completed_at"] is None
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("status", "attempt_count", "http_status", "error_class"),
+    [
+        ("DELIVERED", 1, 200, None),
+        ("DELIVERED", 2, 299, None),
+        ("FAILED", 1, None, "timeout"),
+        ("FAILED", 2, 500, "http_500"),
+    ],
+    ids=["delivered-first-attempt", "delivered-retry", "failed-transport", "failed-http-5xx"],
+)
+def test_app_role_can_complete_with_consistent_terminal_evidence(
+    alert_repository: AlertRepository,
+    status: str,
+    attempt_count: int,
+    http_status: int | None,
+    error_class: str | None,
+) -> None:
+    firing, _ = _claimed_firing(
+        alert_repository, f"terminal-valid-{status}-{attempt_count}-{http_status}"
+    )
+    _complete_delivery_attempt_as_app(
+        firing,
+        status=status,
+        attempt_count=attempt_count,
+        http_status=http_status,
+        error_class=error_class,
+        completed_at=TERMINAL_AT,
+    )
+    row = _delivery_rows()[0]
+    assert row["status"] == status
+    assert row["attempt_count"] == attempt_count
+    assert row["http_status"] == http_status
+    assert row["error_class"] == error_class
+    assert row["completed_at"] == TERMINAL_AT
+    for dsn in (ADMIN_DSN, APP_DSN):
+        with psycopg.connect(dsn) as connection, pytest.raises(psycopg.Error):
+            connection.execute(
+                "UPDATE alert_delivery_attempt SET status = 'DELIVERED', "
+                "attempt_count = 1, http_status = 200, error_class = NULL, "
+                "completed_at = now()"
+            )
 
 
 @pytest.mark.integration

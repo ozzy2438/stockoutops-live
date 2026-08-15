@@ -18,7 +18,28 @@ CREATE TABLE IF NOT EXISTS alert_delivery_attempt (
     payload_hash text NOT NULL CHECK (payload_hash ~ '^[0-9a-f]{64}$'),
     claimed_at timestamptz NOT NULL,
     completed_at timestamptz,
-    UNIQUE (tenant_id, evaluation_id)
+    UNIQUE (tenant_id, evaluation_id),
+    CONSTRAINT alert_delivery_attempt_terminal_evidence_ck CHECK (
+        status = 'CLAIMED'
+        OR (
+            attempt_count BETWEEN 1 AND 2
+            AND completed_at IS NOT NULL
+            AND (
+                (
+                    status = 'DELIVERED'
+                    AND http_status IS NOT NULL
+                    AND http_status BETWEEN 200 AND 299
+                    AND error_class IS NULL
+                )
+                OR (
+                    status = 'FAILED'
+                    AND error_class IS NOT NULL
+                    AND btrim(error_class) <> ''
+                    AND (http_status IS NULL OR http_status NOT BETWEEN 200 AND 299)
+                )
+            )
+        )
+    )
 );
 
 CREATE INDEX IF NOT EXISTS alert_delivery_attempt_tenant_eval_idx
@@ -28,6 +49,10 @@ CREATE OR REPLACE FUNCTION guard_alert_delivery_attempt_insert()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    evaluation_tenant_id text;
+    evaluation_fingerprint text;
+    evaluation_transition text;
 BEGIN
     IF NEW.status IS DISTINCT FROM 'CLAIMED'
        OR NEW.attempt_count IS DISTINCT FROM 0
@@ -36,6 +61,27 @@ BEGIN
        OR NEW.completed_at IS NOT NULL THEN
         RAISE EXCEPTION
             'alert_delivery_attempt must begin as an uncompleted CLAIMED row'
+            USING ERRCODE = '55000';
+    END IF;
+
+    -- alert_evaluation_event is append-only (0006 rejects UPDATE and DELETE), so the
+    -- referenced identity cannot change after this check.
+    SELECT tenant_id, alert_fingerprint, transition
+    INTO evaluation_tenant_id, evaluation_fingerprint, evaluation_transition
+    FROM alert_evaluation_event
+    WHERE alert_evaluation_id = NEW.evaluation_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION
+            'alert_delivery_attempt must reference an existing alert_evaluation_event'
+            USING ERRCODE = '55000';
+    END IF;
+
+    IF NEW.tenant_id IS DISTINCT FROM evaluation_tenant_id
+       OR NEW.alert_fingerprint IS DISTINCT FROM evaluation_fingerprint
+       OR NEW.transition IS DISTINCT FROM evaluation_transition THEN
+        RAISE EXCEPTION
+            'alert_delivery_attempt identity must match the referenced alert_evaluation_event'
             USING ERRCODE = '55000';
     END IF;
 
