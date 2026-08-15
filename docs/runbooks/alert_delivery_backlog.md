@@ -69,9 +69,8 @@ Re-drive is explicit, tenant-scoped, and never automatic:
 ```python
 from stockoutops.alerting.outbox import AlertOutboxRepository
 
-AlertOutboxRepository(database).redrive(
-    principal, outbox_id, now=utcnow(), additional_attempts=5
-)
+repository = AlertOutboxRepository(database)
+repository.redrive(principal, outbox_id, now=utcnow(), additional_attempts=5)
 ```
 
 Re-drive returns the row to `PENDING`, increments `redrive_count`, and raises
