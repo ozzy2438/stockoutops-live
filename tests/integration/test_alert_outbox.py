@@ -965,6 +965,349 @@ def test_app_role_terminal_transition_requires_pr25_ledger(
         )
 
 
+def _create_temp_attempt_event_shadow(connection: psycopg.Connection[Any]) -> None:
+    connection.execute(
+        """
+        CREATE TEMP TABLE alert_delivery_attempt_event (
+            outbox_id bigint,
+            attempt_number integer,
+            outcome text,
+            http_status integer,
+            error_class text,
+            lease_owner text,
+            completed_at timestamptz
+        )
+        """
+    )
+
+
+def _create_temp_attempt_ledger_shadow(connection: psycopg.Connection[Any]) -> None:
+    connection.execute(
+        """
+        CREATE TEMP TABLE alert_delivery_attempt (
+            tenant_id text,
+            evaluation_id bigint,
+            status text,
+            attempt_count integer,
+            http_status integer,
+            error_class text,
+            completed_at timestamptz,
+            alert_fingerprint text,
+            transition text,
+            destination_host text,
+            payload_hash text
+        )
+        """
+    )
+
+
+def _insert_temp_delivered_attempt_event(
+    connection: psycopg.Connection[Any], leased: LeasedDelivery
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO alert_delivery_attempt_event (
+            outbox_id, attempt_number, outcome, http_status, error_class,
+            lease_owner, completed_at
+        ) VALUES (%s, %s, 'DELIVERED', 200, NULL, %s, %s)
+        """,
+        (leased.outbox_id, leased.attempt_number, leased.lease_owner, BASE_AT),
+    )
+
+
+def _insert_temp_delivered_attempt_ledger(
+    connection: psycopg.Connection[Any], leased: LeasedDelivery
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO alert_delivery_attempt (
+            tenant_id, evaluation_id, status, attempt_count, http_status,
+            error_class, completed_at, alert_fingerprint, transition,
+            destination_host, payload_hash
+        ) VALUES (%s, %s, 'DELIVERED', %s, 200, NULL, %s, %s, %s, %s, %s)
+        """,
+        (
+            leased.tenant_id,
+            leased.evaluation_id,
+            leased.attempt_number,
+            BASE_AT,
+            leased.alert_fingerprint,
+            leased.transition,
+            leased.destination_host,
+            leased.payload_hash,
+        ),
+    )
+
+
+def _insert_public_terminal_ledger(
+    connection: psycopg.Connection[Any], leased: LeasedDelivery
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO public.alert_delivery_attempt (
+            tenant_id, evaluation_id, alert_fingerprint, transition,
+            destination_host, status, attempt_count, payload_hash, claimed_at
+        ) VALUES (%s, %s, %s, %s, %s, 'CLAIMED', 0, %s, %s)
+        """,
+        (
+            leased.tenant_id,
+            leased.evaluation_id,
+            leased.alert_fingerprint,
+            leased.transition,
+            leased.destination_host,
+            leased.payload_hash,
+            BASE_AT,
+        ),
+    )
+    connection.execute(
+        """
+        UPDATE public.alert_delivery_attempt
+        SET status = 'DELIVERED', attempt_count = %s, http_status = 200,
+            error_class = NULL, completed_at = %s
+        WHERE tenant_id = %s AND evaluation_id = %s AND status = 'CLAIMED'
+        """,
+        (leased.attempt_number, BASE_AT, leased.tenant_id, leased.evaluation_id),
+    )
+
+
+def _insert_public_attempt_event(
+    connection: psycopg.Connection[Any], leased: LeasedDelivery
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO public.alert_delivery_attempt_event (
+            outbox_id, tenant_id, evaluation_id, attempt_number, outcome,
+            http_status, error_class, lease_owner, idempotency_key,
+            started_at, completed_at
+        ) VALUES (%s, %s, %s, %s, 'DELIVERED', 200, NULL, %s, %s, %s, %s)
+        """,
+        (
+            leased.outbox_id,
+            leased.tenant_id,
+            leased.evaluation_id,
+            leased.attempt_number,
+            leased.lease_owner,
+            leased.idempotency_key,
+            BASE_AT,
+            BASE_AT,
+        ),
+    )
+
+
+def _mark_public_outbox_delivered(connection: psycopg.Connection[Any], outbox_id: int) -> None:
+    connection.execute(
+        """
+        UPDATE public.alert_outbox
+        SET state = 'DELIVERED', last_http_status = 200,
+            last_error_class = NULL, completed_at = %s,
+            lease_owner = NULL, lease_expires_at = NULL, updated_at = %s
+        WHERE outbox_id = %s
+        """,
+        (BASE_AT, BASE_AT, outbox_id),
+    )
+
+
+def _public_evidence_counts() -> tuple[int, int]:
+    with psycopg.connect(ADMIN_DSN) as connection:
+        events = connection.execute(
+            "SELECT count(*) FROM public.alert_delivery_attempt_event"
+        ).fetchone()[0]
+        ledger = connection.execute(
+            "SELECT count(*) FROM public.alert_delivery_attempt"
+        ).fetchone()[0]
+    return events, ledger
+
+
+def test_app_role_temp_attempt_tables_cannot_fake_delivered_evidence(
+    outbox: AlertOutboxRepository,
+) -> None:
+    leased = _leased_for_raw_sql(outbox, prefix="temp-shadow-both")
+    with (
+        psycopg.connect(APP_DSN) as connection,
+        pytest.raises(psycopg.Error),
+        connection.transaction(),
+    ):
+        _create_temp_attempt_event_shadow(connection)
+        _create_temp_attempt_ledger_shadow(connection)
+        _insert_temp_delivered_attempt_event(connection, leased)
+        _insert_temp_delivered_attempt_ledger(connection, leased)
+        _mark_public_outbox_delivered(connection, leased.outbox_id)
+
+    persisted = outbox.get(_principal(), leased.outbox_id)
+    assert persisted["state"] == "IN_FLIGHT"
+    assert persisted["attempt_count"] == 1
+    assert persisted["last_http_status"] is None
+    assert persisted["completed_at"] is None
+    assert outbox.attempt_events(_principal(), leased.outbox_id) == []
+    assert _public_evidence_counts() == (0, 0)
+
+
+def test_app_role_temp_attempt_event_cannot_shadow_public_evidence(
+    outbox: AlertOutboxRepository,
+) -> None:
+    leased = _leased_for_raw_sql(outbox, prefix="temp-shadow-event")
+    with (
+        psycopg.connect(APP_DSN) as connection,
+        pytest.raises(psycopg.Error),
+        connection.transaction(),
+    ):
+        _insert_public_terminal_ledger(connection, leased)
+        _create_temp_attempt_event_shadow(connection)
+        _insert_temp_delivered_attempt_event(connection, leased)
+        _mark_public_outbox_delivered(connection, leased.outbox_id)
+
+    persisted = outbox.get(_principal(), leased.outbox_id)
+    assert persisted["state"] == "IN_FLIGHT"
+    assert persisted["last_http_status"] is None
+    assert outbox.attempt_events(_principal(), leased.outbox_id) == []
+    assert _public_evidence_counts() == (0, 0)
+
+
+def test_app_role_temp_attempt_ledger_cannot_shadow_public_evidence(
+    outbox: AlertOutboxRepository,
+) -> None:
+    leased = _leased_for_raw_sql(outbox, prefix="temp-shadow-ledger")
+    with (
+        psycopg.connect(APP_DSN) as connection,
+        pytest.raises(psycopg.Error),
+        connection.transaction(),
+    ):
+        _insert_public_attempt_event(connection, leased)
+        _create_temp_attempt_ledger_shadow(connection)
+        _insert_temp_delivered_attempt_ledger(connection, leased)
+        _mark_public_outbox_delivered(connection, leased.outbox_id)
+
+    persisted = outbox.get(_principal(), leased.outbox_id)
+    assert persisted["state"] == "IN_FLIGHT"
+    assert persisted["last_http_status"] is None
+    assert outbox.attempt_events(_principal(), leased.outbox_id) == []
+    assert _public_evidence_counts() == (0, 0)
+
+
+def test_app_role_temp_outbox_cannot_authorize_public_attempt_event(
+    outbox: AlertOutboxRepository,
+) -> None:
+    _evaluate("http://127.0.0.1:9/alerts", prefix="temp-shadow-outbox")
+    row = _first_outbox(outbox, _principal())
+    with (
+        psycopg.connect(APP_DSN) as connection,
+        pytest.raises(psycopg.Error),
+        connection.transaction(),
+    ):
+        connection.execute(
+            """
+            CREATE TEMP TABLE alert_outbox (
+                outbox_id bigint,
+                tenant_id text,
+                evaluation_id bigint,
+                idempotency_key text,
+                state text,
+                attempt_count integer,
+                lease_owner text
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO alert_outbox (
+                outbox_id, tenant_id, evaluation_id, idempotency_key,
+                state, attempt_count, lease_owner
+            ) VALUES (%s, %s, %s, %s, 'IN_FLIGHT', 1, 'temp-shadow-owner')
+            """,
+            (
+                row["outbox_id"],
+                row["tenant_id"],
+                row["evaluation_id"],
+                row["idempotency_key"],
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO public.alert_delivery_attempt_event (
+                outbox_id, tenant_id, evaluation_id, attempt_number, outcome,
+                http_status, error_class, lease_owner, idempotency_key,
+                started_at, completed_at
+            ) VALUES (%s, %s, %s, 1, 'DELIVERED', 200, NULL, 'temp-shadow-owner',
+                      %s, %s, %s)
+            """,
+            (
+                row["outbox_id"],
+                row["tenant_id"],
+                row["evaluation_id"],
+                row["idempotency_key"],
+                BASE_AT,
+                BASE_AT,
+            ),
+        )
+
+    persisted = outbox.get(_principal(), row["outbox_id"])
+    assert persisted["state"] == "PENDING"
+    assert persisted["attempt_count"] == 0
+    assert outbox.attempt_events(_principal(), row["outbox_id"]) == []
+    assert _public_evidence_counts() == (0, 0)
+
+
+def test_app_role_temp_evaluation_event_cannot_authorize_outbox_insert(
+    outbox: AlertOutboxRepository,
+) -> None:
+    _evaluate("http://127.0.0.1:9/alerts", prefix="temp-shadow-eval")
+    row = _first_outbox(outbox, _principal())
+    forged_fingerprint = "a" * 64
+    before = len(_all_outbox_rows())
+    with (
+        psycopg.connect(APP_DSN) as connection,
+        pytest.raises(psycopg.Error),
+        connection.transaction(),
+    ):
+        connection.execute(
+            """
+            CREATE TEMP TABLE alert_evaluation_event (
+                alert_evaluation_id bigint,
+                tenant_id text,
+                alert_fingerprint text,
+                transition text
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO alert_evaluation_event (
+                alert_evaluation_id, tenant_id, alert_fingerprint, transition
+            ) VALUES (%s, 't_beta', %s, %s)
+            """,
+            (row["evaluation_id"], forged_fingerprint, row["transition"]),
+        )
+        connection.execute(
+            """
+            INSERT INTO public.alert_outbox (
+                tenant_id, evaluation_id, alert_fingerprint, transition,
+                destination_host, payload_json, payload_hash, idempotency_key,
+                state, attempt_count, max_attempts, redrive_count,
+                next_attempt_at, enqueued_at, updated_at
+            ) VALUES (
+                't_beta', %s, %s, %s, 'x.example', '{}'::jsonb, %s, 'temp-eval-shadow',
+                'PENDING', 0, 5, 0, %s, %s, %s
+            )
+            """,
+            (
+                row["evaluation_id"],
+                forged_fingerprint,
+                row["transition"],
+                "a" * 64,
+                BASE_AT,
+                BASE_AT,
+                BASE_AT,
+            ),
+        )
+
+    assert len(_all_outbox_rows()) == before
+    with psycopg.connect(ADMIN_DSN) as connection:
+        beta = connection.execute(
+            "SELECT count(*) FROM public.alert_outbox WHERE tenant_id = 't_beta'"
+        ).fetchone()[0]
+    assert beta == 0
+
+
 def test_app_role_cannot_delete_outbox_or_attempt_evidence(
     outbox: AlertOutboxRepository,
 ) -> None:

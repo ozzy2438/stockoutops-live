@@ -155,6 +155,7 @@ $$;
 CREATE OR REPLACE FUNCTION guard_alert_outbox_insert()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     evaluation_tenant_id text;
@@ -174,10 +175,11 @@ BEGIN
     END IF;
 
     -- alert_evaluation_event is append-only (0006 rejects UPDATE and DELETE), so the
-    -- referenced identity cannot change after this check.
+    -- referenced identity cannot change after this check. Resolve public.* explicitly
+    -- so a session TEMP relation cannot shadow the canonical evaluation ledger.
     SELECT tenant_id, alert_fingerprint, transition
     INTO evaluation_tenant_id, evaluation_fingerprint, evaluation_transition
-    FROM alert_evaluation_event
+    FROM public.alert_evaluation_event
     WHERE alert_evaluation_id = NEW.evaluation_id;
 
     IF NOT FOUND THEN
@@ -199,6 +201,7 @@ $$;
 CREATE OR REPLACE FUNCTION guard_alert_outbox_update()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     attempt_outcome text;
@@ -289,7 +292,7 @@ BEGIN
         SELECT outcome, http_status, error_class, lease_owner, completed_at
         INTO attempt_outcome, attempt_http_status, attempt_error_class,
              attempt_lease_owner, attempt_completed_at
-        FROM alert_delivery_attempt_event
+        FROM public.alert_delivery_attempt_event
         WHERE outbox_id = OLD.outbox_id
           AND attempt_number = OLD.attempt_count;
 
@@ -333,7 +336,7 @@ BEGIN
             INTO ledger_status, ledger_attempt_count, ledger_http_status,
                  ledger_error_class, ledger_completed_at, ledger_alert_fingerprint,
                  ledger_transition, ledger_destination_host, ledger_payload_hash
-            FROM alert_delivery_attempt
+            FROM public.alert_delivery_attempt
             WHERE tenant_id = OLD.tenant_id
               AND evaluation_id = OLD.evaluation_id;
 
@@ -406,6 +409,7 @@ $$;
 CREATE OR REPLACE FUNCTION guard_alert_delivery_attempt_event_insert()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     outbox_tenant_id text;
@@ -418,7 +422,7 @@ BEGIN
     SELECT tenant_id, evaluation_id, idempotency_key, state, attempt_count, lease_owner
     INTO outbox_tenant_id, outbox_evaluation_id, outbox_idempotency_key,
          outbox_state, outbox_attempt_count, outbox_lease_owner
-    FROM alert_outbox
+    FROM public.alert_outbox
     WHERE outbox_id = NEW.outbox_id
     FOR KEY SHARE;
 
