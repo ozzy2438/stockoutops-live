@@ -636,6 +636,72 @@ def test_app_role_cannot_insert_delivery_attempt_with_forged_identity(
 
 
 @pytest.mark.integration
+def test_app_role_temp_evaluation_event_cannot_authorize_forged_delivery_claim(
+    alert_repository: AlertRepository,
+) -> None:
+    """TEMP alert_evaluation_event must not satisfy the PR #25 insert identity guard."""
+    firing = _firing_without_delivery(alert_repository, "temp-shadow-pr25-eval")
+    forged_fingerprint = "b" * 64
+    with (
+        psycopg.connect(APP_DSN) as connection,
+        pytest.raises(psycopg.Error),
+        connection.transaction(),
+    ):
+        connection.execute(
+            """
+            CREATE TEMP TABLE alert_evaluation_event (
+                alert_evaluation_id bigint,
+                tenant_id text,
+                alert_fingerprint text,
+                transition text
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO alert_evaluation_event (
+                alert_evaluation_id, tenant_id, alert_fingerprint, transition
+            ) VALUES (%s, 't_beta', %s, 'RESOLVED')
+            """,
+            (firing.evaluation_id, forged_fingerprint),
+        )
+        connection.execute(
+            """
+            INSERT INTO public.alert_delivery_attempt (
+                tenant_id, evaluation_id, alert_fingerprint, transition,
+                destination_host, status, attempt_count, http_status,
+                error_class, payload_hash, claimed_at, completed_at
+            ) VALUES (
+                't_beta', %s, %s, 'RESOLVED', '127.0.0.1', 'CLAIMED', 0,
+                NULL, NULL, %s, %s, NULL
+            )
+            """,
+            (
+                firing.evaluation_id,
+                forged_fingerprint,
+                "f" * 64,
+                datetime(2026, 8, 14, 12, 0, tzinfo=UTC),
+            ),
+        )
+    assert _count_delivery_attempts() == 0
+
+    _insert_delivery_attempt_as_app(
+        firing,
+        status="CLAIMED",
+        attempt_count=0,
+        http_status=None,
+        error_class=None,
+        completed_at=None,
+    )
+    row = _delivery_rows()[0]
+    assert row["status"] == "CLAIMED"
+    assert row["tenant_id"] == firing.tenant_id
+    assert row["alert_fingerprint"] == firing.alert_fingerprint
+    assert row["transition"] == firing.transition
+    assert row["evaluation_id"] == firing.evaluation_id
+
+
+@pytest.mark.integration
 def test_app_role_cannot_attach_cross_tenant_delivery_to_non_lifecycle_evaluation(
     alert_repository: AlertRepository,
 ) -> None:

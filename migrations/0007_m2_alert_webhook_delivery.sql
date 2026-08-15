@@ -48,6 +48,7 @@ CREATE INDEX IF NOT EXISTS alert_delivery_attempt_tenant_eval_idx
 CREATE OR REPLACE FUNCTION guard_alert_delivery_attempt_insert()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     evaluation_tenant_id text;
@@ -68,7 +69,7 @@ BEGIN
     -- referenced identity cannot change after this check.
     SELECT tenant_id, alert_fingerprint, transition
     INTO evaluation_tenant_id, evaluation_fingerprint, evaluation_transition
-    FROM alert_evaluation_event
+    FROM public.alert_evaluation_event
     WHERE alert_evaluation_id = NEW.evaluation_id;
 
     IF NOT FOUND THEN
