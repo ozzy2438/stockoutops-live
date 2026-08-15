@@ -237,6 +237,14 @@ class AlertOutboxRepository:
                 started_at=started_at,
                 completed_at=completed_at,
             )
+            self._write_terminal_ledger(
+                connection,
+                leased,
+                status="DELIVERED",
+                http_status=http_status,
+                error_class=None,
+                completed_at=completed_at,
+            )
             self._transition(
                 connection,
                 leased,
@@ -246,14 +254,6 @@ class AlertOutboxRepository:
                 last_error_class=None,
                 completed_at=completed_at,
                 now=completed_at,
-            )
-            self._write_terminal_ledger(
-                connection,
-                leased,
-                status="DELIVERED",
-                http_status=http_status,
-                error_class=None,
-                completed_at=completed_at,
             )
 
     def record_retry(
@@ -322,6 +322,14 @@ class AlertOutboxRepository:
                 started_at=started_at,
                 completed_at=completed_at,
             )
+            self._write_terminal_ledger(
+                connection,
+                leased,
+                status="FAILED",
+                http_status=http_status,
+                error_class=error_class,
+                completed_at=completed_at,
+            )
             self._transition(
                 connection,
                 leased,
@@ -331,14 +339,6 @@ class AlertOutboxRepository:
                 last_error_class=error_class,
                 completed_at=completed_at,
                 now=completed_at,
-            )
-            self._write_terminal_ledger(
-                connection,
-                leased,
-                status="FAILED",
-                http_status=http_status,
-                error_class=error_class,
-                completed_at=completed_at,
             )
 
     # -- re-drive ----------------------------------------------------------
@@ -467,6 +467,27 @@ class AlertOutboxRepository:
         started_at: datetime,
         completed_at: datetime,
     ) -> None:
+        active = connection.execute(
+            """
+            SELECT outbox_id
+            FROM alert_outbox
+            WHERE outbox_id = %s
+              AND state = 'IN_FLIGHT'
+              AND attempt_count = %s
+              AND lease_owner = %s
+            FOR UPDATE
+            """,
+            (
+                leased.outbox_id,
+                leased.attempt_number,
+                leased.lease_owner,
+            ),
+        ).fetchone()
+        if active is None:
+            raise ConflictError(
+                "OUTBOX_LEASE_LOST",
+                "The delivery lease was taken over before this outcome was recorded",
+            )
         connection.execute(
             """
             INSERT INTO alert_delivery_attempt_event (

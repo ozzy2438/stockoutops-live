@@ -687,6 +687,284 @@ def _app_execute(sql: str, params: tuple[Any, ...] = ()) -> None:
         connection.execute(sql, params)
 
 
+def _leased_for_raw_sql(
+    outbox: AlertOutboxRepository,
+    *,
+    prefix: str,
+    worker_id: str = "raw-sql-worker",
+) -> LeasedDelivery:
+    _evaluate("http://127.0.0.1:9/alerts", prefix=prefix)
+    return outbox.lease(worker_id=worker_id, now=BASE_AT)[0]
+
+
+def _insert_attempt_event_raw(
+    connection: psycopg.Connection[Any],
+    leased: LeasedDelivery,
+    *,
+    outcome: str,
+    http_status: int | None,
+    error_class: str | None,
+    attempt_number: int | None = None,
+    lease_owner: str | None = None,
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO alert_delivery_attempt_event (
+            outbox_id, tenant_id, evaluation_id, attempt_number, outcome,
+            http_status, error_class, lease_owner, idempotency_key,
+            started_at, completed_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            leased.outbox_id,
+            leased.tenant_id,
+            leased.evaluation_id,
+            leased.attempt_number if attempt_number is None else attempt_number,
+            outcome,
+            http_status,
+            error_class,
+            leased.lease_owner if lease_owner is None else lease_owner,
+            leased.idempotency_key,
+            BASE_AT,
+            BASE_AT,
+        ),
+    )
+
+
+def test_app_role_cannot_fabricate_delivered_outbox_without_evidence(
+    outbox: AlertOutboxRepository,
+) -> None:
+    _evaluate("http://127.0.0.1:9/alerts", prefix="raw-no-evidence")
+    row = _first_outbox(outbox, _principal())
+
+    with (
+        psycopg.connect(APP_DSN) as connection,
+        pytest.raises(psycopg.Error),
+        connection.transaction(),
+    ):
+        connection.execute(
+            """
+                UPDATE alert_outbox
+                SET state = 'IN_FLIGHT', attempt_count = 1,
+                    lease_owner = 'forged-app',
+                    lease_expires_at = %s + interval '1 minute', updated_at = %s
+                WHERE outbox_id = %s
+                """,
+            (BASE_AT, BASE_AT, row["outbox_id"]),
+        )
+        connection.execute(
+            """
+                UPDATE alert_outbox
+                SET state = 'DELIVERED', last_http_status = 200,
+                    last_error_class = NULL, completed_at = %s,
+                    lease_owner = NULL, lease_expires_at = NULL, updated_at = %s
+                WHERE outbox_id = %s
+                """,
+            (BASE_AT, BASE_AT, row["outbox_id"]),
+        )
+
+    persisted = outbox.get(_principal(), row["outbox_id"])
+    assert persisted["state"] == "PENDING"
+    assert persisted["attempt_count"] == 0
+    assert outbox.attempt_events(_principal(), row["outbox_id"]) == []
+    with psycopg.connect(ADMIN_DSN) as connection:
+        ledger_count = connection.execute("SELECT count(*) FROM alert_delivery_attempt").fetchone()[
+            0
+        ]
+    assert ledger_count == 0
+
+
+def test_app_role_cannot_forge_delivered_event_for_pending_outbox(
+    outbox: AlertOutboxRepository,
+) -> None:
+    _evaluate("http://127.0.0.1:9/alerts", prefix="raw-pending-event")
+    row = _first_outbox(outbox, _principal())
+    with psycopg.connect(APP_DSN) as connection, pytest.raises(psycopg.Error):
+        connection.execute(
+            """
+            INSERT INTO alert_delivery_attempt_event (
+                outbox_id, tenant_id, evaluation_id, attempt_number, outcome,
+                http_status, error_class, lease_owner, idempotency_key,
+                started_at, completed_at
+            ) VALUES (%s, %s, %s, 1, 'DELIVERED', 200, NULL, 'forged-app', %s, %s, %s)
+            """,
+            (
+                row["outbox_id"],
+                row["tenant_id"],
+                row["evaluation_id"],
+                row["idempotency_key"],
+                BASE_AT,
+                BASE_AT,
+            ),
+        )
+
+
+@pytest.mark.parametrize(
+    ("attempt_offset", "lease_owner"),
+    [(1, None), (0, "wrong-worker")],
+    ids=["wrong-attempt-number", "wrong-lease-owner"],
+)
+def test_app_role_attempt_event_must_match_active_attempt_and_lease(
+    outbox: AlertOutboxRepository,
+    attempt_offset: int,
+    lease_owner: str | None,
+) -> None:
+    leased = _leased_for_raw_sql(outbox, prefix=f"raw-active-{attempt_offset}-{lease_owner}")
+    with psycopg.connect(APP_DSN) as connection, pytest.raises(psycopg.Error):
+        _insert_attempt_event_raw(
+            connection,
+            leased,
+            outcome="DELIVERED",
+            http_status=200,
+            error_class=None,
+            attempt_number=leased.attempt_number + attempt_offset,
+            lease_owner=lease_owner,
+        )
+
+
+def test_app_role_cannot_append_attempt_event_after_outbox_is_terminal(
+    outbox: AlertOutboxRepository,
+) -> None:
+    with RecordingWebhookServer() as receiver:
+        _evaluate(receiver.url, prefix="raw-terminal-event")
+        build_worker(
+            outbox, _settings(receiver.url), worker_id="terminal-worker", clock=lambda: BASE_AT
+        ).run_once()
+    row = _first_outbox(outbox, _principal())
+    terminal = LeasedDelivery(
+        outbox_id=row["outbox_id"],
+        tenant_id=row["tenant_id"],
+        evaluation_id=row["evaluation_id"],
+        alert_fingerprint=row["alert_fingerprint"],
+        transition=row["transition"],
+        destination_host=row["destination_host"],
+        payload=dict(row["payload_json"]),
+        payload_hash=row["payload_hash"],
+        idempotency_key=row["idempotency_key"],
+        attempt_number=2,
+        max_attempts=row["max_attempts"],
+        lease_owner="forged-after-terminal",
+        lease_expires_at=BASE_AT + timedelta(minutes=1),
+    )
+    with psycopg.connect(APP_DSN) as connection, pytest.raises(psycopg.Error):
+        _insert_attempt_event_raw(
+            connection,
+            terminal,
+            outcome="DELIVERED",
+            http_status=200,
+            error_class=None,
+        )
+
+
+def test_app_role_terminal_transition_requires_attempt_event(
+    outbox: AlertOutboxRepository,
+) -> None:
+    leased = _leased_for_raw_sql(outbox, prefix="raw-terminal-no-event")
+    with psycopg.connect(APP_DSN) as connection, pytest.raises(psycopg.Error):
+        connection.execute(
+            """
+            UPDATE alert_outbox
+            SET state = 'DELIVERED', last_http_status = 200,
+                last_error_class = NULL, completed_at = %s,
+                lease_owner = NULL, lease_expires_at = NULL, updated_at = %s
+            WHERE outbox_id = %s
+            """,
+            (BASE_AT, BASE_AT, leased.outbox_id),
+        )
+
+
+@pytest.mark.parametrize(
+    ("event_outcome", "event_http", "event_error", "target_state"),
+    [
+        ("RETRYABLE_FAILURE", 503, "http_503", "DELIVERED"),
+        ("DELIVERED", 200, None, "DEAD_LETTER"),
+    ],
+    ids=["delivered-with-failure-evidence", "dead-letter-with-success-evidence"],
+)
+def test_app_role_terminal_transition_requires_compatible_attempt_evidence(
+    outbox: AlertOutboxRepository,
+    event_outcome: str,
+    event_http: int,
+    event_error: str | None,
+    target_state: str,
+) -> None:
+    leased = _leased_for_raw_sql(outbox, prefix=f"raw-incompatible-{target_state}")
+    with (
+        psycopg.connect(APP_DSN) as connection,
+        pytest.raises(psycopg.Error),
+        connection.transaction(),
+    ):
+        _insert_attempt_event_raw(
+            connection,
+            leased,
+            outcome=event_outcome,
+            http_status=event_http,
+            error_class=event_error,
+        )
+        connection.execute(
+            """
+                UPDATE alert_outbox
+                SET state = %s, last_http_status = %s, last_error_class = %s,
+                    completed_at = %s, lease_owner = NULL,
+                    lease_expires_at = NULL, updated_at = %s
+                WHERE outbox_id = %s
+                """,
+            (
+                target_state,
+                200 if target_state == "DELIVERED" else 503,
+                None if target_state == "DELIVERED" else "http_503",
+                BASE_AT,
+                BASE_AT,
+                leased.outbox_id,
+            ),
+        )
+
+
+def test_app_role_retry_transition_requires_retryable_attempt_event(
+    outbox: AlertOutboxRepository,
+) -> None:
+    leased = _leased_for_raw_sql(outbox, prefix="raw-retry-no-event")
+    with psycopg.connect(APP_DSN) as connection, pytest.raises(psycopg.Error):
+        connection.execute(
+            """
+            UPDATE alert_outbox
+            SET state = 'PENDING', last_http_status = 503,
+                last_error_class = 'http_503', next_attempt_at = %s + interval '1 minute',
+                lease_owner = NULL, lease_expires_at = NULL, updated_at = %s
+            WHERE outbox_id = %s
+            """,
+            (BASE_AT, BASE_AT, leased.outbox_id),
+        )
+
+
+def test_app_role_terminal_transition_requires_pr25_ledger(
+    outbox: AlertOutboxRepository,
+) -> None:
+    leased = _leased_for_raw_sql(outbox, prefix="raw-no-terminal-ledger")
+    with (
+        psycopg.connect(APP_DSN) as connection,
+        pytest.raises(psycopg.Error),
+        connection.transaction(),
+    ):
+        _insert_attempt_event_raw(
+            connection,
+            leased,
+            outcome="DELIVERED",
+            http_status=200,
+            error_class=None,
+        )
+        connection.execute(
+            """
+                UPDATE alert_outbox
+                SET state = 'DELIVERED', last_http_status = 200,
+                    last_error_class = NULL, completed_at = %s,
+                    lease_owner = NULL, lease_expires_at = NULL, updated_at = %s
+                WHERE outbox_id = %s
+                """,
+            (BASE_AT, BASE_AT, leased.outbox_id),
+        )
+
+
 def test_app_role_cannot_delete_outbox_or_attempt_evidence(
     outbox: AlertOutboxRepository,
 ) -> None:
@@ -723,8 +1001,9 @@ def test_outbox_identity_and_payload_are_immutable(outbox: AlertOutboxRepository
         ("idempotency_key", "'forged'"),
         ("destination_host", "'evil.example'"),
     ):
-        with psycopg.connect(ADMIN_DSN) as connection, pytest.raises(psycopg.Error):
-            connection.execute(f"UPDATE alert_outbox SET {column} = {value}")
+        for dsn in (ADMIN_DSN, APP_DSN):
+            with psycopg.connect(dsn) as connection, pytest.raises(psycopg.Error):
+                connection.execute(f"UPDATE alert_outbox SET {column} = {value}")
 
 
 def test_delivered_is_a_final_state(outbox: AlertOutboxRepository) -> None:

@@ -200,6 +200,21 @@ CREATE OR REPLACE FUNCTION guard_alert_outbox_update()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    attempt_outcome text;
+    attempt_http_status integer;
+    attempt_error_class text;
+    attempt_lease_owner text;
+    attempt_completed_at timestamptz;
+    ledger_status text;
+    ledger_attempt_count integer;
+    ledger_http_status integer;
+    ledger_error_class text;
+    ledger_completed_at timestamptz;
+    ledger_alert_fingerprint text;
+    ledger_transition text;
+    ledger_destination_host text;
+    ledger_payload_hash text;
 BEGIN
     IF NEW.outbox_id IS DISTINCT FROM OLD.outbox_id
        OR NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
@@ -246,6 +261,120 @@ BEGIN
             USING ERRCODE = '55000';
     END IF;
 
+    IF OLD.state = 'PENDING' AND NEW.state = 'IN_FLIGHT' THEN
+        IF NEW.attempt_count <> OLD.attempt_count + 1
+           OR OLD.next_attempt_at > NEW.updated_at
+           OR NEW.lease_expires_at <= NEW.updated_at THEN
+            RAISE EXCEPTION 'alert_outbox lease must claim one due active attempt'
+                USING ERRCODE = '55000';
+        END IF;
+    END IF;
+
+    IF OLD.state = 'IN_FLIGHT' AND NEW.state = 'IN_FLIGHT' THEN
+        IF NEW.attempt_count <> OLD.attempt_count + 1
+           OR OLD.lease_expires_at > NEW.updated_at
+           OR NEW.lease_expires_at <= NEW.updated_at THEN
+            RAISE EXCEPTION 'alert_outbox takeover requires an expired lease and next attempt'
+                USING ERRCODE = '55000';
+        END IF;
+    END IF;
+
+    IF OLD.state = 'IN_FLIGHT'
+       AND NEW.state IN ('DELIVERED', 'PENDING', 'DEAD_LETTER') THEN
+        IF NEW.attempt_count <> OLD.attempt_count THEN
+            RAISE EXCEPTION 'alert_outbox outcome must preserve the active attempt number'
+                USING ERRCODE = '55000';
+        END IF;
+
+        SELECT outcome, http_status, error_class, lease_owner, completed_at
+        INTO attempt_outcome, attempt_http_status, attempt_error_class,
+             attempt_lease_owner, attempt_completed_at
+        FROM alert_delivery_attempt_event
+        WHERE outbox_id = OLD.outbox_id
+          AND attempt_number = OLD.attempt_count;
+
+        IF NOT FOUND
+           OR attempt_lease_owner IS DISTINCT FROM OLD.lease_owner
+           OR attempt_http_status IS DISTINCT FROM NEW.last_http_status
+           OR attempt_error_class IS DISTINCT FROM NEW.last_error_class
+           OR attempt_completed_at IS DISTINCT FROM NEW.updated_at THEN
+            RAISE EXCEPTION
+                'alert_outbox outcome requires matching active-lease attempt evidence'
+                USING ERRCODE = '55000';
+        END IF;
+
+        IF NEW.state = 'DELIVERED' AND attempt_outcome IS DISTINCT FROM 'DELIVERED' THEN
+            RAISE EXCEPTION 'alert_outbox DELIVERED requires successful attempt evidence'
+                USING ERRCODE = '55000';
+        ELSIF NEW.state = 'PENDING'
+              AND attempt_outcome NOT IN ('RETRYABLE_FAILURE', 'AMBIGUOUS') THEN
+            RAISE EXCEPTION 'alert_outbox retry requires retryable or ambiguous evidence'
+                USING ERRCODE = '55000';
+        ELSIF NEW.state = 'PENDING' AND NEW.attempt_count >= NEW.max_attempts THEN
+            RAISE EXCEPTION 'alert_outbox retry cannot exceed its attempt budget'
+                USING ERRCODE = '55000';
+        ELSIF NEW.state = 'DEAD_LETTER'
+              AND attempt_outcome NOT IN (
+                  'RETRYABLE_FAILURE', 'PERMANENT_FAILURE', 'AMBIGUOUS'
+              ) THEN
+            RAISE EXCEPTION 'alert_outbox DEAD_LETTER requires failure or ambiguous evidence'
+                USING ERRCODE = '55000';
+        ELSIF NEW.state = 'DEAD_LETTER'
+              AND attempt_outcome IN ('RETRYABLE_FAILURE', 'AMBIGUOUS')
+              AND NEW.attempt_count < NEW.max_attempts THEN
+            RAISE EXCEPTION
+                'alert_outbox retryable or ambiguous evidence must exhaust the attempt budget'
+                USING ERRCODE = '55000';
+        END IF;
+
+        IF NEW.state IN ('DELIVERED', 'DEAD_LETTER') THEN
+            SELECT status, attempt_count, http_status, error_class, completed_at,
+                   alert_fingerprint, transition, destination_host, payload_hash
+            INTO ledger_status, ledger_attempt_count, ledger_http_status,
+                 ledger_error_class, ledger_completed_at, ledger_alert_fingerprint,
+                 ledger_transition, ledger_destination_host, ledger_payload_hash
+            FROM alert_delivery_attempt
+            WHERE tenant_id = OLD.tenant_id
+              AND evaluation_id = OLD.evaluation_id;
+
+            IF NOT FOUND THEN
+                RAISE EXCEPTION
+                    'alert_outbox terminal outcome requires terminal delivery ledger evidence'
+                    USING ERRCODE = '55000';
+            END IF;
+
+            -- The PR #25 ledger is one immutable row per evaluation. On the
+            -- initial terminal outcome it must match exactly. After an explicit
+            -- re-drive it remains the immutable FAILED record of the earlier
+            -- dead letter; the current attempt event is the new outcome record.
+            IF ledger_alert_fingerprint IS DISTINCT FROM OLD.alert_fingerprint
+                OR ledger_transition IS DISTINCT FROM OLD.transition
+                OR ledger_destination_host IS DISTINCT FROM OLD.destination_host
+                OR ledger_payload_hash IS DISTINCT FROM OLD.payload_hash THEN
+                RAISE EXCEPTION
+                    'alert_outbox identity must match terminal delivery ledger evidence'
+                    USING ERRCODE = '55000';
+            END IF;
+
+            IF OLD.redrive_count = 0 AND (
+                ledger_status IS DISTINCT FROM
+                    CASE WHEN NEW.state = 'DELIVERED' THEN 'DELIVERED' ELSE 'FAILED' END
+                OR ledger_attempt_count IS DISTINCT FROM NEW.attempt_count
+                OR ledger_http_status IS DISTINCT FROM NEW.last_http_status
+                OR ledger_error_class IS DISTINCT FROM NEW.last_error_class
+                OR ledger_completed_at IS DISTINCT FROM NEW.completed_at
+            ) THEN
+                RAISE EXCEPTION
+                    'alert_outbox terminal outcome must match terminal delivery ledger evidence'
+                    USING ERRCODE = '55000';
+            ELSIF OLD.redrive_count > 0 AND ledger_status IS DISTINCT FROM 'FAILED' THEN
+                RAISE EXCEPTION
+                    'alert_outbox re-drive requires its immutable prior FAILED ledger evidence'
+                    USING ERRCODE = '55000';
+            END IF;
+        END IF;
+    END IF;
+
     -- Only an explicit re-drive may raise the attempt ceiling, and only while
     -- leaving DEAD_LETTER.
     IF NEW.max_attempts IS DISTINCT FROM OLD.max_attempts
@@ -282,11 +411,16 @@ DECLARE
     outbox_tenant_id text;
     outbox_evaluation_id bigint;
     outbox_idempotency_key text;
+    outbox_state text;
+    outbox_attempt_count integer;
+    outbox_lease_owner text;
 BEGIN
-    SELECT tenant_id, evaluation_id, idempotency_key
-    INTO outbox_tenant_id, outbox_evaluation_id, outbox_idempotency_key
+    SELECT tenant_id, evaluation_id, idempotency_key, state, attempt_count, lease_owner
+    INTO outbox_tenant_id, outbox_evaluation_id, outbox_idempotency_key,
+         outbox_state, outbox_attempt_count, outbox_lease_owner
     FROM alert_outbox
-    WHERE outbox_id = NEW.outbox_id;
+    WHERE outbox_id = NEW.outbox_id
+    FOR KEY SHARE;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'alert_delivery_attempt_event must reference an existing alert_outbox row'
@@ -297,6 +431,14 @@ BEGIN
        OR NEW.evaluation_id IS DISTINCT FROM outbox_evaluation_id
        OR NEW.idempotency_key IS DISTINCT FROM outbox_idempotency_key THEN
         RAISE EXCEPTION 'alert_delivery_attempt_event identity must match its alert_outbox row'
+            USING ERRCODE = '55000';
+    END IF;
+
+    IF outbox_state IS DISTINCT FROM 'IN_FLIGHT'
+       OR NEW.attempt_number IS DISTINCT FROM outbox_attempt_count
+       OR NEW.lease_owner IS DISTINCT FROM outbox_lease_owner THEN
+        RAISE EXCEPTION
+            'alert_delivery_attempt_event must match the active IN_FLIGHT attempt and lease'
             USING ERRCODE = '55000';
     END IF;
 
