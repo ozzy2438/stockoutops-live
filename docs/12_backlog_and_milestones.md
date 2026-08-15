@@ -122,14 +122,20 @@ The former M1-01–M1-10 package is preserved but is not executable M1 authority
 > Issue #24 is authorised only for a disabled-by-default local HTTPS webhook
 > adapter over that foundation. It does not complete M2-04 or prove
 > external/staging delivery.
+>
+> Issue #26 is authorised only for the durable PostgreSQL delivery outbox and
+> leased recovery worker that closes the ADR-0008 crash gap. It does not
+> complete M2-04, prove an environment, or add destination/SSRF/egress
+> controls.
 
 - [x] M2-01 — Shadow processor engineering foundation merged (`execute=false`, PR #18). Not G1 exit.
 - [x] M2-02 — Deterministic diff-report engineering foundation merged (PR #18). Not G1 exit.
 - [ ] M2-03 — UAT user recruitment (≥ 3) + consent forms.
 - [ ] M2-04 — SLO alerts wired. Local/CI policy-wiring candidate tracked by #21;
-  local HTTPS webhook adapter candidate tracked by #24. Actual environment
-  delivery and proof remain pending. **M2-04 PENDING — no external/staging
-  alert delivery has yet been proven.**
+  local HTTPS webhook adapter candidate tracked by #24; durable delivery outbox
+  and recovery worker tracked by #26. Actual environment delivery and proof
+  remain pending. **M2-04 PENDING — no external/staging alert delivery has yet
+  been proven.**
 - [ ] M2-05 — First 100 genuine shadow cases analysed; disagreement characterisation.
 - [ ] M2-06 — G1 exit gate report + Fizz `APPROVE`.
 

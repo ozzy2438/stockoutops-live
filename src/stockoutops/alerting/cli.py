@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from stockoutops.alerting.delivery_settings import AlertDeliverySettings
+from stockoutops.alerting.enqueue import build_delivery_enqueuer
 from stockoutops.alerting.report import (
     build_alert_report,
     load_shadow_alert_source,
@@ -55,9 +56,12 @@ def main() -> None:
     generated_at = _timestamp(args.generated_at)
     database = Database(os.environ["DATABASE_URL"])
     service = AlertService(
-        AlertRepository(database),
+        AlertRepository(
+            database,
+            delivery_enqueuer=build_delivery_enqueuer(AlertDeliverySettings.from_env()),
+        ),
         clock=lambda: generated_at,
-        sink=build_alert_sink(database, AlertDeliverySettings.from_env()),
+        sink=build_alert_sink(),
     )
     evaluations = []
     for snapshot in source.snapshots:

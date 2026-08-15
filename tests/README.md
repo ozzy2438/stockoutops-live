@@ -8,8 +8,10 @@ missing-required-evidence measurement, genuine-case schema validation, determini
 diff/report output, tenant isolation, idempotency and conflict handling,
 mutation-controlled results, restart recovery, real-PostgreSQL same-case
 concurrency, genuine-UAT intake fail-closed behaviour, the rule that synthetic
-cases cannot count toward official M2-05, and the disabled-by-default local HTTPS
-webhook delivery adapter (loopback only; not a live/staging delivery proof).
+cases cannot count toward official M2-05, the disabled-by-default local HTTPS
+webhook delivery adapter, and the durable delivery outbox with its adversarial
+crash, lease-expiry, concurrency, retry-exhaustion, dead-letter, re-drive, and
+tenant-isolation proofs (loopback only; not a live/staging delivery proof).
 
 ```bash
 make test

@@ -10,9 +10,12 @@ from stockoutops.errors import ConfigurationError
 
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 DEFAULT_TIMEOUT_SECONDS = 2.0
-DEFAULT_MAX_ATTEMPTS = 2
+# The durable outbox retries across worker runs with backoff, so the bound is
+# the outbox attempt budget rather than the two tries the synchronous adapter
+# could afford on the evaluation call path.
+DEFAULT_MAX_ATTEMPTS = 5
 MAX_TIMEOUT_SECONDS = 5.0
-MAX_ATTEMPTS = 2
+MAX_ATTEMPTS = 10
 
 
 def parse_enabled_flag(value: str | None) -> bool:

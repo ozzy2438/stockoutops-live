@@ -10,6 +10,7 @@ All notable changes to this project will be documented here. Format follows [Kee
 - M2 execute-false shadow foundation: versioned controlled-synthetic case pack, processor, PostgreSQL persistence, and deterministic diff reports (PR #18).
 - M2 UAT/real-shadow readiness bridge: contract-derived missing-evidence metric, future genuine-case contract, local JSON intake, UAT/consent templates, and first-100 collection tooling that excludes synthetic cases from M2-05.
 - M2 local HTTPS webhook `AlertSink` candidate: disabled-by-default generic webhook delivery with claim-before-send persistence and loopback proof (Issue #24). M2-04 remains pending.
+- M2 durable PostgreSQL alert-delivery outbox candidate: transactional delivery intent, leased recovery worker, stale-lease takeover, bounded backoff, dead-letter, explicit re-drive, and append-only per-attempt evidence, replacing the ADR-0008 at-most-once claim-before-send crash gap (Issue #26, ADR-0009). Durable at-least-once processing with receiver idempotency, never exactly-once delivery. M2-04 remains pending.
 
 ### Changed
 

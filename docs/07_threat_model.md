@@ -1,6 +1,6 @@
 # 07 — Security, Privacy & Threat Model
 
-> Owner: Honey. Reviewer: Fizz. Status: **Milestone-0 planning baseline; bounded M1 and merged M2 shadow controls plus M2-04 local alert-policy and disabled-by-default webhook adapter candidates**. Unresolved production controls remain gated by `13_risks_and_open_decisions.md`. Method: STRIDE per trust boundary, plus AI-specific threat classes.
+> Owner: Honey. Reviewer: Fizz. Status: **Milestone-0 planning baseline; bounded M1 and merged M2 shadow controls plus M2-04 local alert-policy, disabled-by-default webhook adapter, and durable delivery-outbox candidates**. Unresolved production controls remain gated by `13_risks_and_open_decisions.md`. Method: STRIDE per trust boundary, plus AI-specific threat classes.
 
 ## Trust boundaries
 
@@ -113,11 +113,35 @@ loopback HTTP receiver. This is not a live/staging delivery proof.
 | Threat | Implemented local control | Residual / limit |
 |---|---|---|
 | Accidental outbound delivery | Default sink is disabled; CI `alert-pilot` does not set the enable flag; evaluation rows keep delivery count at zero | An operator who later sets the enable flag in a shared environment could contact a configured URL |
-| Duplicate lifecycle notifications | Claim-before-HTTP unique `(tenant_id, evaluation_id)` plus advisory lock; replay and `STILL_FIRING` do not send | Crash after claim and before POST can drop a notification (at-most-once) |
+| Duplicate lifecycle notifications | Unique `(tenant_id, evaluation_id)` outbox intent plus advisory lock; replay and `STILL_FIRING` do not enqueue | Superseded by ADR-0009: the at-most-once crash gap is closed; duplicate suppression now depends on receiver idempotency |
 | SSRF / credentialed URL | HTTPS required except loopback HTTP; userinfo in the URL is rejected; redirects are disabled | This is not a full SSRF allow-list or network egress proxy |
 | Secret leakage | Optional token is environment-only, sent as `Authorization`, and omitted from payloads, delivery rows, and reports | Process environment inspection remains possible on the local host |
-| Delivery failure hides the alert | Evaluation persist commits before HTTP; timeout is 2s with at most two attempts | Failed delivery is recorded separately; there is no outbox replay worker |
+| Delivery failure hides the alert | Evaluation persist commits with the delivery intent; bounded timeout and attempt budget | Superseded by ADR-0009: a leased outbox worker now retries, dead-letters, and supports re-drive |
 | Synthetic evidence treated as live SLO | Payload and evaluations remain `SIMULATED` with `live_slo_evidence_eligible=false` | A later measured-input contract is still required before any SLO claim |
+
+## Phase 1 durable delivery-outbox threat-model diff
+
+Issue #26 replaces the ADR-0008 claim-before-send path with a durable
+PostgreSQL outbox (`alert_outbox`), append-only per-attempt evidence
+(`alert_delivery_attempt_event`), and a leased recovery worker. Delivery stays
+disabled by default. Tests use only a loopback HTTP receiver. This is **not** a
+live/staging delivery proof and does **not** add SSRF, DNS, or egress controls.
+
+**M2-04 PENDING — no external/staging alert delivery has yet been proven.**
+
+| Threat | Implemented local control | Residual / limit |
+|---|---|---|
+| Crash drops a notification (the ADR-0008 gap) | Intent commits in the evaluation transaction; a crash before send, after send, or mid-timeout leaves a leasable row that a worker recovers after lease expiry | Requires a worker to actually run; an unrun worker means silent `PENDING` backlog |
+| Network call inside a database transaction | Enqueue performs no HTTP; the worker leases, closes the transaction, sends, then records the outcome separately | A hanging receiver delays that worker's batch, not evaluation |
+| Duplicate effective delivery | Stable `{tenant}:{evaluation}:{transition}` `Idempotency-Key` on every attempt including redelivery | At-least-once transport: a receiver ignoring the header can observe duplicates. Never claimed as exactly-once |
+| Ambiguous timeout misread as failure | Timeouts are recorded as `AMBIGUOUS`, never as failure, and are retried | The true receiver outcome is unknowable from the sender side |
+| Two workers deliver the same intent | `FOR UPDATE SKIP LOCKED` leasing; outcome writes are conditional on still holding the lease | Lease expiry is time-based; a worker paused past expiry loses its claim by design |
+| Retry storm / unbounded egress | Deterministic exponential backoff (2s base, 300s cap) under an explicit `max_attempts` budget, then dead-letter | Backlog and dead-letter counts are defined but unwired to any alarm |
+| Dead letter silently discarded | Dead-lettered rows persist and are recoverable only through an explicit tenant-scoped operator re-drive; automatic re-drive does not exist | Nothing yet alerts an operator that a dead letter is waiting |
+| Delivery-evidence tampering | `alert_delivery_attempt_event` rejects UPDATE and DELETE; outbox identity/payload columns are immutable, `DELIVERED` is final, and forbidden transitions raise | Migration/admin remains privileged; no WORM or cryptographic tamper-evidence claim |
+| Cross-tenant delivery or evidence | Repository methods take `Principal` first; the worker's lease scan is the one cross-tenant read and each row carries its own tenant, enforced again by database triggers | Application-level plus trigger enforcement; PostgreSQL RLS remains Phase 3 |
+| Destination tampering / SSRF | Destination host is bound at enqueue and immutable; URL credentials rejected; HTTPS required outside loopback; redirects disabled | **Unchanged by this phase.** No allow-list, DNS validation, or private/metadata-address rejection — that is Phase 2 |
+| Secret leakage | Token stays environment-only and is sent as `Authorization`; it is absent from payloads, outbox rows, attempt evidence, and reports | Process environment inspection remains possible on the local host |
 
 ## Diff process
 

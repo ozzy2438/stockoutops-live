@@ -2,7 +2,7 @@
 
 **Human-Supervised AI Decisioning & Reliability Platform**
 
-> **Current implementation status: M1 local slice closed; M2-01/M2-02 and the bounded UAT-readiness bridge merged; M2-03 through M2-06 remain pending.** The local/CI M2-04 alert-policy foundation and disabled-by-default HTTPS webhook adapter are implementation candidates, not delivered alerting. **M2-04 PENDING — no external/staging alert delivery has yet been proven.** This is not production-ready, production-proven, a current AWS deployment, live UAT, or evidence of model, SLO, or business quality. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
+> **Current implementation status: M1 local slice closed; M2-01/M2-02 and the bounded UAT-readiness bridge merged; M2-03 through M2-06 remain pending.** The local/CI M2-04 alert-policy foundation, the disabled-by-default HTTPS webhook adapter, and the durable delivery outbox are implementation candidates, not delivered alerting. **M2-04 PENDING — no external/staging alert delivery has yet been proven.** This is not production-ready, production-proven, a current AWS deployment, live UAT, or evidence of model, SLO, or business quality. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
 
 StockoutOps Live is the new canonical Phase-2 implementation. The [PharmaRetail AI Control Tower](https://github.com/ozzy2438/PharmaRetail-AI-Control-Tower) is reference material only; useful patterns may be selectively migrated after review, but the old project is not a runtime dependency or a codebase to copy wholesale.
 
@@ -89,8 +89,15 @@ It evaluates a frozen provider-neutral policy set, appends tenant-scoped alert e
 to PostgreSQL, and writes ignored JSON/Markdown reports under `evaluation/reports/`.
 The same fingerprint has one derived active state; advisory locking and request hashes
 make repeated/concurrent evaluation idempotent, while resolution is a new append-only
-event. Missing signals remain `UNMEASURED`. A generic HTTPS webhook `AlertSink` exists
-but is disabled by default and is not invoked by `make alert-pilot`.
+event. Missing signals remain `UNMEASURED`.
+
+Outbound delivery is disabled by default and is not invoked by `make alert-pilot`. When
+it is explicitly enabled, evaluation enqueues a durable delivery intent inside the same
+PostgreSQL transaction as the alert evidence, and the separate leased worker
+(`make alert-outbox-worker`) performs the HTTPS request outside any transaction with
+bounded retry, dead-letter, and an explicit re-drive path. This is durable at-least-once
+processing with a stable receiver `Idempotency-Key`; it is **not** exactly-once network
+delivery. See `docs/decisions/0009-m2-durable-alert-outbox.md`.
 **M2-04 PENDING — no external/staging alert delivery has yet been proven.**
 
 ---

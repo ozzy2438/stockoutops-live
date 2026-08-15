@@ -1,20 +1,21 @@
-"""Provider-neutral HTTPS webhook AlertSink. Disabled-by-default; local/CI only."""
+"""Provider-neutral HTTPS webhook transport. Disabled-by-default; local/CI only.
+
+The transport performs the HTTP request only. Durability, leasing, retry, and
+evidence belong to the outbox worker, so no network call is ever made inside a
+database transaction.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from datetime import UTC, datetime
 from typing import Any
 
 import httpx
 
 from stockoutops.alerting.contracts import AlertEvaluation
-from stockoutops.alerting.delivery import AlertDeliveryRepository, should_notify
-from stockoutops.alerting.delivery_settings import AlertDeliverySettings, destination_host
-from stockoutops.evidence.provenance import canonical_hash
-from stockoutops.identity import Principal
+from stockoutops.alerting.delivery_settings import AlertDeliverySettings
 
 RETRYABLE_ERROR_CLASSES = frozenset({"timeout", "connection_error", "transport_error"})
+AMBIGUOUS_ERROR_CLASSES = frozenset({"timeout"})
 
 
 def webhook_payload(evaluation: AlertEvaluation) -> dict[str, Any]:
@@ -46,10 +47,6 @@ def webhook_payload(evaluation: AlertEvaluation) -> dict[str, Any]:
     }
 
 
-def delivery_idempotency_key(evaluation: AlertEvaluation) -> str:
-    return f"{evaluation.tenant_id}:{evaluation.evaluation_id}:{evaluation.transition}"
-
-
 def classify_transport_error(exc: BaseException) -> str:
     if isinstance(exc, httpx.TimeoutException):
         return "timeout"
@@ -58,83 +55,31 @@ def classify_transport_error(exc: BaseException) -> str:
     return "transport_error"
 
 
-class HttpsWebhookSink:
+class WebhookTransport:
+    """Single bounded HTTP POST. No retry, no persistence, no transaction."""
+
     def __init__(
         self,
-        repository: AlertDeliveryRepository,
         settings: AlertDeliverySettings,
         *,
-        clock: Callable[[], datetime] | None = None,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
-        if not settings.enabled:
-            raise ValueError("HttpsWebhookSink requires enabled delivery settings")
         settings.validate()
-        self.repository = repository
+        if settings.webhook_url is None:
+            raise ValueError("WebhookTransport requires a configured webhook URL")
         self.settings = settings
-        self.clock = clock or (lambda: datetime.now(UTC))
         self.transport = transport
 
-    def deliver(self, principal: Principal, evaluation: AlertEvaluation) -> None:
-        if evaluation.tenant_id != principal.tenant_id:
-            return
-        if not should_notify(evaluation):
-            return
-        webhook_url = self.settings.webhook_url
-        if webhook_url is None:
-            return
-        payload = webhook_payload(evaluation)
-        claimed = self.repository.claim(
-            principal,
-            evaluation,
-            destination_host=destination_host(webhook_url),
-            payload_hash=canonical_hash(payload),
-            claimed_at=self.clock(),
-        )
-        if not claimed:
-            return
-        http_status: int | None = None
-        error_class: str | None = None
-        attempt_count = 0
-        delivered = False
-        for attempt_count in range(1, self.settings.max_attempts + 1):
-            try:
-                http_status = self._post(webhook_url, evaluation, payload)
-            except httpx.HTTPError as exc:
-                http_status = None
-                error_class = classify_transport_error(exc)
-                if (
-                    error_class not in RETRYABLE_ERROR_CLASSES
-                    or attempt_count >= self.settings.max_attempts
-                ):
-                    break
-                continue
-            except Exception:
-                http_status = None
-                error_class = "transport_error"
-                break
-            if 200 <= http_status < 300:
-                delivered = True
-                error_class = None
-                break
-            error_class = f"http_{http_status}"
-            if http_status < 500 or attempt_count >= self.settings.max_attempts:
-                break
-        self.repository.complete(
-            principal,
-            evaluation,
-            status="DELIVERED" if delivered else "FAILED",
-            attempt_count=attempt_count,
-            http_status=http_status,
-            error_class=error_class,
-            completed_at=self.clock(),
-        )
+    @property
+    def webhook_url(self) -> str:
+        assert self.settings.webhook_url is not None
+        return self.settings.webhook_url
 
-    def _post(self, webhook_url: str, evaluation: AlertEvaluation, payload: dict[str, Any]) -> int:
+    def post(self, payload: dict[str, Any], *, idempotency_key: str) -> int:
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "Idempotency-Key": delivery_idempotency_key(evaluation),
+            "Idempotency-Key": idempotency_key,
         }
         if self.settings.token:
             headers["Authorization"] = f"Bearer {self.settings.token}"
@@ -143,5 +88,5 @@ class HttpsWebhookSink:
             follow_redirects=False,
             transport=self.transport,
         ) as client:
-            response = client.post(webhook_url, json=payload, headers=headers)
+            response = client.post(self.webhook_url, json=payload, headers=headers)
         return response.status_code

@@ -9,6 +9,8 @@
 - `data_stale.md` — handling `DATA_STALE` events per mart (M1).
 - `llm_outage.md` — provider outage: failover to human-only mode (M1).
 - `rls_leakage.md` — SEV1 response for any RLS invariant breach (M1).
+- `alert_delivery_backlog.md` — durable alert-outbox backlog, stalled worker,
+  dead letters, and the explicit re-drive path (M2; local/CI only).
 - `cost_blowout.md` — investigating and mitigating cost spikes (M2).
 - `rollback.md` — gate-level rollback procedures (M2–M4).
 - `postmortems/` — index of incident post-mortems (starts empty).
