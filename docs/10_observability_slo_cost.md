@@ -1,6 +1,6 @@
 # 10 — Observability, SLOs & Cost
 
-> Owner: Bumble (build) + Honey (design) + Fizz (assurance). Status: **TARGET plan plus a local/CI M2-04 policy-wiring candidate; no live SLO evidence, dashboard, alert delivery, or SLO attainment claim**.
+> Owner: Bumble (build) + Honey (design) + Fizz (assurance). Status: **TARGET plan plus local/CI M2-04 policy-wiring and disabled-by-default webhook adapter candidates; no live SLO evidence, dashboard, or SLO attainment claim. M2-04 PENDING — no external/staging alert delivery has yet been proven.**
 
 ## Signals
 
@@ -65,8 +65,10 @@ latency metadata, error category, and external-action count. Cost is labelled
 **M2-04 SLO alerts — PENDING.** The Issue #21 implementation candidate evaluates
 only current controlled-synthetic shadow-report signals through a provider-neutral
 local/CI policy layer. It persists append-only evaluations and generates local JSON
-and Markdown. It does not create a CloudWatch alarm, deliver a notification, measure
-an error budget, or establish SLO attainment.
+and Markdown. Issue #24 adds a disabled-by-default HTTPS webhook adapter over that
+foundation. It does not create a CloudWatch alarm, measure an error budget, or
+establish SLO attainment. **M2-04 PENDING — no external/staging alert delivery has
+yet been proven.**
 
 ### Implemented local/CI policy candidate
 
@@ -87,18 +89,39 @@ application permissions and a database trigger. This is mutation control, not WO
 cryptographic tamper evidence.
 
 Synthetic inputs are permanently marked ineligible as live SLO evidence in this
-foundation. Missing metrics produce `UNMEASURED`, never an implicit `OK`. The future
-sink is an interface only; no CloudWatch, SNS, email, chat, or paging adapter exists.
+foundation. Missing metrics produce `UNMEASURED`, never an implicit `OK`.
+
+### Local HTTPS webhook adapter candidate
+
+A generic HTTPS webhook `AlertSink` may be enabled only with explicit configuration.
+The default is disabled and performs zero outbound requests. `make alert-pilot` and
+CI keep that default. When enabled, the adapter:
+
+- sends only `FIRED` and `RESOLVED` lifecycle notifications
+- claims a tenant-scoped delivery-attempt row before HTTP so replay and concurrency
+  cannot duplicate a notification
+- uses a 2s timeout and at most two attempts (retry on timeout, connection error, or
+  HTTP 5xx)
+- requires HTTPS except for loopback HTTP used by the local proof receiver
+- preserves original alert evaluation rows if delivery fails
+
+Optional `STOCKOUTOPS_ALERT_WEBHOOK_TOKEN` is never committed, logged, or stored.
+This adapter is not Slack, PagerDuty, email, CloudWatch, or SNS. It is not a
+live/staging delivery proof.
+
+**M2-04 PENDING — no external/staging alert delivery has yet been proven.**
 
 Run after `make shadow-pilot`:
 
 ```bash
 make alert-pilot
+make alert-webhook-proof
 ```
 
-Disable/rollback by not invoking the CLI and reverting the implementation commit.
-Migration `0006` is additive and forward-only; retain its append-only history for
-inspection. There is no delivered alert to compensate or disable.
+Disable/rollback by leaving `STOCKOUTOPS_ALERT_WEBHOOK_ENABLED` unset or `false`
+and reverting the implementation commit. Migrations `0006` and `0007` are additive
+and forward-only; retain append-only evaluation history and any delivery-attempt
+rows for inspection.
 
 ## Dashboards
 

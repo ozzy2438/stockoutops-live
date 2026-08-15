@@ -9,6 +9,7 @@ All notable changes to this project will be documented here. Format follows [Kee
 - Initial repository bootstrap (Milestone 0 scaffold): governance docs, architecture v2 outline, tool contracts, threat model, rollout plan, evaluation plan, observability & SLO plan, failure-injection scenarios, backlog & milestones, ADR framework, CI/security/eval workflow skeletons, issue & PR templates, CODEOWNERS.
 - M2 execute-false shadow foundation: versioned controlled-synthetic case pack, processor, PostgreSQL persistence, and deterministic diff reports (PR #18).
 - M2 UAT/real-shadow readiness bridge: contract-derived missing-evidence metric, future genuine-case contract, local JSON intake, UAT/consent templates, and first-100 collection tooling that excludes synthetic cases from M2-05.
+- M2 local HTTPS webhook `AlertSink` candidate: disabled-by-default generic webhook delivery with claim-before-send persistence and loopback proof (Issue #24). M2-04 remains pending.
 
 ### Changed
 

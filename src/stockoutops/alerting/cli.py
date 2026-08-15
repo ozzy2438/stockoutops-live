@@ -9,6 +9,7 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
+from stockoutops.alerting.delivery_settings import AlertDeliverySettings
 from stockoutops.alerting.report import (
     build_alert_report,
     load_shadow_alert_source,
@@ -16,6 +17,7 @@ from stockoutops.alerting.report import (
 )
 from stockoutops.alerting.repository import AlertRepository
 from stockoutops.alerting.service import AlertService
+from stockoutops.alerting.sink import build_alert_sink
 from stockoutops.database import Database
 from stockoutops.identity import Principal
 
@@ -51,9 +53,11 @@ def main() -> None:
 
     source = load_shadow_alert_source(Path(args.shadow_report))
     generated_at = _timestamp(args.generated_at)
+    database = Database(os.environ["DATABASE_URL"])
     service = AlertService(
-        AlertRepository(Database(os.environ["DATABASE_URL"])),
+        AlertRepository(database),
         clock=lambda: generated_at,
+        sink=build_alert_sink(database, AlertDeliverySettings.from_env()),
     )
     evaluations = []
     for snapshot in source.snapshots:

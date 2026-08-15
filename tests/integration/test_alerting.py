@@ -73,6 +73,7 @@ def test_alert_migration_is_recorded_and_repeat_is_noop(postgres_schema) -> None
             row[0] for row in connection.execute("SELECT version FROM schema_migration").fetchall()
         }
     assert "0006_m2_alert_policy_foundation.sql" in versions
+    assert "0007_m2_alert_webhook_delivery.sql" in versions
     assert (
         run_migrations(
             ADMIN_DSN,

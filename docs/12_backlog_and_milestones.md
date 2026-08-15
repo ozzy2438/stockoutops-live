@@ -118,12 +118,18 @@ The former M1-01–M1-10 package is preserved but is not executable M1 authority
 > Issue #21 is authorised only for a provider-neutral local/CI alert-policy
 > engineering foundation. It does not deliver an alert, prove an environment, or
 > complete M2-04.
+>
+> Issue #24 is authorised only for a disabled-by-default local HTTPS webhook
+> adapter over that foundation. It does not complete M2-04 or prove
+> external/staging delivery.
 
 - [x] M2-01 — Shadow processor engineering foundation merged (`execute=false`, PR #18). Not G1 exit.
 - [x] M2-02 — Deterministic diff-report engineering foundation merged (PR #18). Not G1 exit.
 - [ ] M2-03 — UAT user recruitment (≥ 3) + consent forms.
 - [ ] M2-04 — SLO alerts wired. Local/CI policy-wiring candidate tracked by #21;
-  actual environment delivery and proof remain pending.
+  local HTTPS webhook adapter candidate tracked by #24. Actual environment
+  delivery and proof remain pending. **M2-04 PENDING — no external/staging
+  alert delivery has yet been proven.**
 - [ ] M2-05 — First 100 genuine shadow cases analysed; disagreement characterisation.
 - [ ] M2-06 — G1 exit gate report + Fizz `APPROVE`.
 

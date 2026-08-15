@@ -85,5 +85,8 @@ def test_simulated_contract_cannot_be_relabelled_as_live_slo_evidence() -> None:
         _snapshot(evidence_label="MEASURED")
     statuses = {item.signal: item.status for item in UNWIRED_SIGNALS}
     assert statuses["external_alert_delivery"] == "UNWIRED"
+    assert "disabled by default" in next(
+        item.reason for item in UNWIRED_SIGNALS if item.signal == "external_alert_delivery"
+    )
     assert statuses["production_availability"] == "FUTURE"
     assert statuses["deterministic_provider_latency"] == "UNMEASURED"

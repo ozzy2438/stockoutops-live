@@ -85,6 +85,7 @@ def clean_database(postgres_schema: None) -> None:
         connection.execute(
             """
             TRUNCATE TABLE
+                alert_delivery_attempt,
                 alert_evaluation_event,
                 review_decision, tool_invocation, idempotency_key,
                 workflow_event, investigation_run,
