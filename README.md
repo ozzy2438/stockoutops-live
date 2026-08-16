@@ -2,6 +2,51 @@
 
 **Human-Supervised AI Decisioning & Reliability Platform**
 
+Production-oriented and independently assured. This is **not** production-ready.
+It does not claim live business impact, stockout reduction, revenue impact, or
+real-user adoption.
+
+## Business Problem
+
+Retail stockout investigations require analysts to manually assemble fragmented
+inventory, demand, supplier and policy evidence, making decisions slow,
+inconsistent and difficult to audit.
+
+## My Role
+
+Osman Orka acted as Technical Project Lead & Data/AI Engineer on an independent
+AI-assisted multi-role engineering project, defining scope, making
+architecture/reliability decisions, coordinating implementation and independent
+assurance, and owning final acceptance decisions.
+
+## What We Built / Key Decisions
+
+- Human-supervised stockout investigation workflow
+- Governed T1–T3 evidence and a cited recommendation
+- Explicit human approve / edit / reject / escalate controls
+- Tenant-scoped PostgreSQL persistence
+- Durable alert-delivery outbox and leased recovery worker
+- Append-only evidence and failure-safe, execute-false operation
+- AWS (ECS Fargate, Amazon RDS, CloudWatch) as the reviewed **target**
+  architecture — not a live AWS staging or resilience proof in this repository
+
+## Proven Outcomes
+
+Repository-measured evidence only. These are engineering-rehearsal results, not
+live operational outcomes:
+
+- **226** passing tests on the Phase 1 closed head
+- Repeatable migrations: **8 applied / 0 on replay**
+- Independently reproduced adversarial database-integrity testing (restricted
+  `stockoutops_app` role, including TEMP / `search_path` shadowing)
+- **12/12** deterministic controlled-synthetic shadow cases
+- **100%** citation coverage in that pack
+- **Zero** unsupported citations
+- **Zero** missing required evidence
+- **Zero** external actions in the controlled pack
+
+## Engineering status and limitations
+
 > **Current implementation status: M1 local slice closed; M2-01/M2-02 and the bounded UAT-readiness bridge merged; M2-03 through M2-06 remain pending.** The local/CI M2-04 alert-policy foundation, the disabled-by-default HTTPS webhook adapter, and the durable delivery outbox are implementation candidates, not delivered alerting. **M2-04 PENDING — no external/staging alert delivery has yet been proven.** This is not production-ready, production-proven, a current AWS deployment, live UAT, or evidence of model, SLO, or business quality. Milestone-gate status is determined by `docs/12_backlog_and_milestones.md` and its linked GitHub evidence.
 
 StockoutOps Live is the new canonical Phase-2 implementation. The [PharmaRetail AI Control Tower](https://github.com/ozzy2438/PharmaRetail-AI-Control-Tower) is reference material only; useful patterns may be selectively migrated after review, but the old project is not a runtime dependency or a codebase to copy wholesale.
@@ -261,4 +306,4 @@ are in `docs/12_backlog_and_milestones.md`.
 
 ---
 
-*Last updated: 2026-08-11 M1-I1 local implementation candidate. Owner: Osman Orka. Independent M1 evidence and assurance remain pending.*
+*Last updated: 2026-08-16 recruiter-facing README packaging. Owner: Osman Orka. Milestone-gate status remains as stated in the engineering-status section above.*
