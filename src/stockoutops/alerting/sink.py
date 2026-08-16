@@ -1,8 +1,12 @@
 """Outbound alert sink boundary.
 
-Default implementation is disabled and performs no network I/O. An optional
-HTTPS webhook adapter may be injected when explicitly enabled; that adapter is
-a local/CI engineering candidate and is not a live/staging delivery proof.
+Delivery no longer happens on the evaluation call path. A durable outbox intent
+is enqueued inside the evaluation transaction (`alerting.enqueue`) and a leased
+worker (`alerting.worker`) performs HTTP outside any transaction, so a crash
+between claim and send cannot drop a notification.
+
+The sink boundary is retained for non-delivery observers and is a no-op by
+default. It must never perform network I/O on the evaluation path.
 """
 
 from __future__ import annotations
@@ -10,8 +14,6 @@ from __future__ import annotations
 from typing import Protocol
 
 from stockoutops.alerting.contracts import AlertEvaluation
-from stockoutops.alerting.delivery_settings import AlertDeliverySettings
-from stockoutops.database import Database
 from stockoutops.identity import Principal
 
 
@@ -20,16 +22,13 @@ class AlertSink(Protocol):
 
 
 class DisabledAlertSink:
-    """Explicit no-op sink used when delivery is disabled (the default)."""
+    """Explicit no-op sink. The default on every path."""
 
     def deliver(self, principal: Principal, evaluation: AlertEvaluation) -> None:
         return
 
 
-def build_alert_sink(database: Database, settings: AlertDeliverySettings) -> AlertSink:
-    if not settings.enabled:
-        return DisabledAlertSink()
-    from stockoutops.alerting.delivery import AlertDeliveryRepository
-    from stockoutops.alerting.webhook import HttpsWebhookSink
+def build_alert_sink() -> AlertSink:
+    """Always the no-op sink; outbound delivery is the outbox worker's job."""
 
-    return HttpsWebhookSink(AlertDeliveryRepository(database), settings)
+    return DisabledAlertSink()

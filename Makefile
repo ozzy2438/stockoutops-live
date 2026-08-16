@@ -1,7 +1,7 @@
 PYTHON := .venv/bin/python
 PIP := .venv/bin/pip
 
-.PHONY: setup up migrate seed shadow-cases shadow-pilot shadow-intake shadow-exclude shadow-collection alert-pilot alert-webhook-proof serve lint test smoke-stub down docker-build
+.PHONY: setup up migrate seed shadow-cases shadow-pilot shadow-intake shadow-exclude shadow-collection alert-pilot alert-webhook-proof alert-outbox-proof alert-outbox-worker serve lint test smoke-stub down docker-build
 
 setup:
 	python3.12 -m venv .venv
@@ -37,6 +37,12 @@ alert-pilot:
 
 alert-webhook-proof:
 	$(PYTHON) -m pytest tests/unit/test_alert_delivery.py tests/integration/test_alert_delivery.py -q
+
+alert-outbox-proof:
+	$(PYTHON) -m pytest tests/integration/test_alert_outbox.py -q
+
+alert-outbox-worker:
+	$(PYTHON) -m stockoutops.alerting.worker_cli
 
 serve:
 	$(PYTHON) -m uvicorn stockoutops.app:create_app --factory --host 127.0.0.1 --port 8000

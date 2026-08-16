@@ -1,4 +1,11 @@
-"""Tenant-scoped claim-before-send persistence for webhook delivery attempts."""
+"""Tenant-scoped terminal ledger for alert-delivery outcomes.
+
+`claim` and `complete` are ledger primitives, not a delivery path. Durable
+delivery is owned by `alerting.outbox`; the outbox worker writes this ledger's
+CLAIMED and terminal rows inside one transaction with no network call between
+them. Nothing here may be used to claim a row and then perform HTTP — that was
+the ADR-0008 crash gap ADR-0009 removes.
+"""
 
 from __future__ import annotations
 

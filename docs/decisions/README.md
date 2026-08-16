@@ -31,4 +31,5 @@ We use lightweight ADRs (Michael Nygard style) to record decisions that constrai
 - `0005-use-local-simulated-identity-for-m1.md` — Accepted for local M1; effective after scope-lock merge.
 - `0006-m2-uat-shadow-intake-boundary.md` — Proposed; genuine-UAT intake and contract-derived missing-evidence metric.
 - `0007-m2-local-alert-policy-contract.md` — Accepted 2026-08-14 for the bounded local/CI alert policies and append-only evaluation state; M2-04 stays pending and no external delivery or live SLO is proven.
-- `0008-m2-local-https-webhook-alert-delivery.md` — Proposed; disabled-by-default local HTTPS webhook `AlertSink`; M2-04 stays pending and no external/staging delivery is proven.
+- `0008-m2-local-https-webhook-alert-delivery.md` — Proposed; disabled-by-default local HTTPS webhook adapter. Its accepted at-most-once claim-before-send trade-off is amended by ADR-0009; M2-04 stays pending.
+- `0009-m2-durable-alert-outbox.md` — Proposed; durable PostgreSQL delivery outbox, leased recovery worker, bounded retry, dead-letter and re-drive. Amends the ADR-0008 crash-gap trade-off. Durable at-least-once processing plus receiver idempotency, never exactly-once delivery; M2-04 stays pending.

@@ -7,6 +7,7 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 import pytest
 
 from stockoutops.alerting.contracts import AlertCorrelation, AlertEvaluation
@@ -16,13 +17,20 @@ from stockoutops.alerting.delivery_settings import (
     parse_enabled_flag,
     validate_webhook_url,
 )
+from stockoutops.alerting.enqueue import WebhookOutboxEnqueuer, build_delivery_enqueuer
+from stockoutops.alerting.outbox import backoff_delay_seconds, delivery_idempotency_key
 from stockoutops.alerting.sink import DisabledAlertSink, build_alert_sink
 from stockoutops.alerting.webhook import (
-    HttpsWebhookSink,
+    WebhookTransport,
     classify_transport_error,
     webhook_payload,
 )
-from stockoutops.database import Database
+from stockoutops.alerting.worker import (
+    WorkerRunResult,
+    build_worker,
+    classify_exception,
+    classify_response,
+)
 from stockoutops.errors import ConfigurationError
 from stockoutops.identity import Principal
 from tests.webhook_receiver import RecordingWebhookServer
@@ -69,20 +77,6 @@ def _evaluation(**overrides: Any) -> AlertEvaluation:
     return AlertEvaluation(**payload)
 
 
-class MemoryDeliveryRepository:
-    def __init__(self, *, claim_result: bool = True) -> None:
-        self.claim_result = claim_result
-        self.claims: list[dict[str, Any]] = []
-        self.completions: list[dict[str, Any]] = []
-
-    def claim(self, principal: Principal, evaluation: AlertEvaluation, **kwargs: Any) -> bool:
-        self.claims.append({"principal": principal, "evaluation": evaluation, **kwargs})
-        return self.claim_result
-
-    def complete(self, principal: Principal, evaluation: AlertEvaluation, **kwargs: Any) -> None:
-        self.completions.append({"principal": principal, "evaluation": evaluation, **kwargs})
-
-
 def _settings(url: str, **overrides: Any) -> AlertDeliverySettings:
     payload = {
         "enabled": True,
@@ -107,8 +101,8 @@ def test_delivery_is_disabled_by_default(monkeypatch: pytest.MonkeyPatch) -> Non
     assert parse_enabled_flag(None) is False
     assert parse_enabled_flag("false") is False
     assert parse_enabled_flag("true") is True
-    sink = build_alert_sink(Database("postgresql://unused"), settings)
-    assert isinstance(sink, DisabledAlertSink)
+    assert isinstance(build_alert_sink(), DisabledAlertSink)
+    assert build_delivery_enqueuer(settings) is None
 
 
 def test_enabled_without_url_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -149,126 +143,135 @@ def test_payload_is_labelled_simulated_and_omits_secrets() -> None:
     assert should_notify(_evaluation(idempotent_replay=True)) is False
 
 
-def test_enabled_firing_alert_posts_once() -> None:
-    repository = MemoryDeliveryRepository()
+def test_transport_posts_once_with_the_stable_idempotency_key() -> None:
     with RecordingWebhookServer() as receiver:
-        sink = HttpsWebhookSink(repository, _settings(receiver.url))
-        sink.deliver(_principal(), _evaluation())
-        assert len(receiver.requests) == 1
-        request = receiver.requests[0]
-        assert request["body"]["transition"] == "FIRED"
-        assert request["body"]["evidence_label"] == "SIMULATED"
-        assert request["idempotency_key"] == "t_alpha:1:FIRED"
-    assert repository.completions[0]["status"] == "DELIVERED"
-    assert repository.completions[0]["attempt_count"] == 1
-
-
-def test_replay_and_non_lifecycle_transitions_do_not_post() -> None:
-    repository = MemoryDeliveryRepository()
-    with RecordingWebhookServer() as receiver:
-        sink = HttpsWebhookSink(repository, _settings(receiver.url))
-        sink.deliver(_principal(), _evaluation(idempotent_replay=True))
-        sink.deliver(
-            _principal(),
-            _evaluation(transition="STILL_FIRING", state="FIRING", previous_state="FIRING"),
+        transport = WebhookTransport(_settings(receiver.url))
+        status = transport.post(
+            webhook_payload(_evaluation()),
+            idempotency_key=delivery_idempotency_key("t_alpha", 1, "FIRED"),
         )
-        sink.deliver(
-            _principal(),
-            _evaluation(transition="INITIAL_OK", state="OK", observed_value=0.1),
-        )
-        assert receiver.requests == []
-        assert repository.claims == []
+    assert status == 200
+    assert len(receiver.requests) == 1
+    request = receiver.requests[0]
+    assert request["body"]["transition"] == "FIRED"
+    assert request["body"]["evidence_label"] == "SIMULATED"
+    assert request["idempotency_key"] == "t_alpha:1:FIRED"
 
 
-def test_lost_claim_prevents_duplicate_http() -> None:
-    repository = MemoryDeliveryRepository(claim_result=False)
-    with RecordingWebhookServer() as receiver:
-        sink = HttpsWebhookSink(repository, _settings(receiver.url))
-        sink.deliver(_principal(), _evaluation())
-        assert receiver.requests == []
-        assert repository.completions == []
+def test_idempotency_key_is_deterministic_and_tenant_qualified() -> None:
+    first = delivery_idempotency_key("t_alpha", 7, "RESOLVED")
+    assert first == delivery_idempotency_key("t_alpha", 7, "RESOLVED")
+    assert first != delivery_idempotency_key("t_beta", 7, "RESOLVED")
+    assert first != delivery_idempotency_key("t_alpha", 7, "FIRED")
+    assert first.startswith("t_alpha:")
 
 
-def test_timeout_retries_are_bounded() -> None:
-    repository = MemoryDeliveryRepository()
-    with RecordingWebhookServer(hang_seconds=0.6) as receiver:
-        sink = HttpsWebhookSink(
-            repository,
-            _settings(receiver.url, timeout_seconds=0.2, max_attempts=2),
-        )
-        started = time.monotonic()
-        sink.deliver(_principal(), _evaluation())
-        elapsed = time.monotonic() - started
-    completion = repository.completions[0]
-    assert completion["status"] == "FAILED"
-    assert completion["error_class"] == "timeout"
-    assert completion["attempt_count"] == 2
-    assert elapsed < 1.5
+def test_transport_never_follows_redirects() -> None:
+    transport = WebhookTransport(_settings("https://alerts.example.test/hook"))
+    assert transport.settings.webhook_url == "https://alerts.example.test/hook"
+    # follow_redirects is pinned False in WebhookTransport.post; assert the
+    # source contract rather than contacting a real redirecting host.
+    import inspect
+
+    assert "follow_redirects=False" in inspect.getsource(WebhookTransport.post)
 
 
-def test_server_error_retries_client_error_does_not() -> None:
-    repository = MemoryDeliveryRepository()
-    with RecordingWebhookServer(status_sequence=[503, 200]) as receiver:
-        sink = HttpsWebhookSink(repository, _settings(receiver.url))
-        sink.deliver(_principal(), _evaluation())
-        assert [item["body"]["transition"] for item in receiver.requests] == ["FIRED", "FIRED"]
-    assert repository.completions[0]["status"] == "DELIVERED"
-    assert repository.completions[0]["attempt_count"] == 2
+def test_response_classification_separates_retryable_from_permanent() -> None:
+    assert classify_response(200).outcome == "DELIVERED"
+    assert classify_response(204).outcome == "DELIVERED"
 
-    repository = MemoryDeliveryRepository()
-    with RecordingWebhookServer(status=400) as receiver:
-        sink = HttpsWebhookSink(repository, _settings(receiver.url))
-        sink.deliver(_principal(), _evaluation())
-        assert len(receiver.requests) == 1
-    assert repository.completions[0]["status"] == "FAILED"
-    assert repository.completions[0]["error_class"] == "http_400"
-    assert repository.completions[0]["attempt_count"] == 1
+    server_error = classify_response(503)
+    assert server_error.outcome == "RETRYABLE_FAILURE"
+    assert server_error.retryable is True
+    assert server_error.error_class == "http_503"
+
+    client_error = classify_response(400)
+    assert client_error.outcome == "PERMANENT_FAILURE"
+    assert client_error.retryable is False
 
 
-def test_unreachable_receiver_is_a_bounded_connection_failure() -> None:
+def test_timeout_is_classified_ambiguous_not_failed() -> None:
+    """A timeout may have reached the receiver; it must never suppress redelivery."""
+
+    decision = classify_exception(httpx.ReadTimeout("timed out"))
+    assert decision.outcome == "AMBIGUOUS"
+    assert decision.retryable is True
+    assert decision.http_status is None
+    assert decision.error_class == "timeout"
+
+
+def test_connection_error_is_retryable_and_unambiguous() -> None:
+    decision = classify_exception(httpx.ConnectError("refused"))
+    assert decision.outcome == "RETRYABLE_FAILURE"
+    assert decision.retryable is True
+    assert decision.error_class == "connection_error"
+
+
+def test_unreachable_receiver_raises_a_bounded_connection_error() -> None:
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]
     sock.close()
-    repository = MemoryDeliveryRepository()
-    sink = HttpsWebhookSink(
-        repository,
-        _settings(f"http://127.0.0.1:{port}/alerts", timeout_seconds=0.2),
-    )
-    sink.deliver(_principal(), _evaluation())
-    completion = repository.completions[0]
-    assert completion["status"] == "FAILED"
-    assert completion["error_class"] == "connection_error"
-    assert completion["attempt_count"] == 2
-    dumped = json.dumps(completion, default=str)
-    assert SECRET_TOKEN not in dumped
+    transport = WebhookTransport(_settings(f"http://127.0.0.1:{port}/alerts", timeout_seconds=0.2))
+    started = time.monotonic()
+    with pytest.raises(httpx.HTTPError) as exc_info:
+        transport.post({"a": 1}, idempotency_key="k")
+    elapsed = time.monotonic() - started
+    assert classify_exception(exc_info.value).retryable is True
+    assert elapsed < 2.0
 
 
-def test_secret_token_is_sent_but_absent_from_payload_and_completion() -> None:
-    repository = MemoryDeliveryRepository()
+def test_timeout_is_bounded_by_the_configured_budget() -> None:
+    with RecordingWebhookServer(hang_seconds=1.5) as receiver:
+        transport = WebhookTransport(_settings(receiver.url, timeout_seconds=0.2))
+        started = time.monotonic()
+        with pytest.raises(httpx.HTTPError):
+            transport.post({"a": 1}, idempotency_key="k")
+        elapsed = time.monotonic() - started
+    assert elapsed < 1.4
+
+
+def test_secret_token_is_sent_but_absent_from_the_payload() -> None:
     with RecordingWebhookServer() as receiver:
-        sink = HttpsWebhookSink(
-            repository,
-            _settings(receiver.url, token=SECRET_TOKEN),
-        )
-        sink.deliver(_principal(), _evaluation())
+        transport = WebhookTransport(_settings(receiver.url, token=SECRET_TOKEN))
+        transport.post(webhook_payload(_evaluation()), idempotency_key="k")
         request = receiver.requests[0]
         assert request["authorization"] == f"Bearer {SECRET_TOKEN}"
         assert SECRET_TOKEN not in json.dumps(request["body"])
-    dumped = json.dumps(repository.completions, default=str)
-    assert SECRET_TOKEN not in dumped
     assert classify_transport_error(Exception(SECRET_TOKEN)) == "transport_error"
     assert SECRET_TOKEN not in classify_transport_error(Exception(SECRET_TOKEN))
 
 
-def test_disabled_factory_ignores_configured_url(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_enqueuer_is_none_when_delivery_is_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("STOCKOUTOPS_ALERT_WEBHOOK_ENABLED", "false")
     monkeypatch.setenv("STOCKOUTOPS_ALERT_WEBHOOK_URL", "http://127.0.0.1:9/alerts")
     monkeypatch.setenv("STOCKOUTOPS_ALERT_WEBHOOK_TOKEN", SECRET_TOKEN)
     settings = AlertDeliverySettings.from_env()
     assert settings.enabled is False
-    sink = build_alert_sink(Database("postgresql://unused"), settings)
-    with RecordingWebhookServer() as receiver:
-        sink.deliver(_principal(), _evaluation())
-        assert receiver.requests == []
+    assert build_delivery_enqueuer(settings) is None
     assert os.getenv("STOCKOUTOPS_ALERT_WEBHOOK_TOKEN") == SECRET_TOKEN
+
+
+def test_worker_requires_enabled_settings() -> None:
+    disabled = AlertDeliverySettings(enabled=False, webhook_url=None)
+    with pytest.raises(ValueError, match="requires enabled delivery settings"):
+        build_worker(object(), disabled, worker_id="w")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="requires enabled delivery settings"):
+        WebhookOutboxEnqueuer(disabled)
+
+
+def test_backoff_is_deterministic_bounded_and_capped() -> None:
+    assert backoff_delay_seconds(1) == 2.0
+    assert backoff_delay_seconds(2) == 4.0
+    assert backoff_delay_seconds(3) == 8.0
+    assert backoff_delay_seconds(50) == 300.0
+    assert backoff_delay_seconds(1) == backoff_delay_seconds(1)
+
+
+def test_worker_run_result_merges_counters() -> None:
+    merged = WorkerRunResult(leased=1, delivered=1).merged(
+        WorkerRunResult(leased=2, retried=1, dead_lettered=1, lease_lost=1)
+    )
+    assert merged == WorkerRunResult(
+        leased=3, delivered=1, retried=1, dead_lettered=1, lease_lost=1
+    )

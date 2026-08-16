@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from psycopg.types.json import Jsonb
 
@@ -18,6 +18,9 @@ from stockoutops.database import Database
 from stockoutops.errors import ConflictError, NotFoundError
 from stockoutops.evidence.provenance import canonical_hash
 from stockoutops.identity import Principal
+
+if TYPE_CHECKING:  # pragma: no cover - import cycle guard
+    from stockoutops.alerting.enqueue import DeliveryEnqueuer
 
 
 def _lock_key(value: str) -> int:
@@ -90,8 +93,14 @@ def _next_state(
 class AlertRepository:
     """All tenant-scoped public methods receive Principal first."""
 
-    def __init__(self, database: Database) -> None:
+    def __init__(
+        self,
+        database: Database,
+        *,
+        delivery_enqueuer: DeliveryEnqueuer | None = None,
+    ) -> None:
         self.database = database
+        self.delivery_enqueuer = delivery_enqueuer
 
     def record(
         self,
@@ -191,7 +200,12 @@ class AlertRepository:
                     evaluated_at,
                 ),
             ).fetchone()
-        return _row_to_evaluation(row, idempotent_replay=False)
+            evaluation = _row_to_evaluation(row, idempotent_replay=False)
+            # Durable delivery intent commits atomically with the evaluation
+            # append. No network call happens inside this transaction.
+            if self.delivery_enqueuer is not None:
+                self.delivery_enqueuer.enqueue(connection, evaluation, enqueued_at=evaluated_at)
+        return evaluation
 
     def events(self, principal: Principal, fingerprint: str) -> list[AlertEvaluation]:
         with self.database.connect() as connection:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import socket
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from inspect import signature
 from pathlib import Path
 
@@ -13,9 +13,12 @@ import pytest
 from stockoutops.alerting.contracts import AlertCorrelation, AlertEvaluation, AlertMetricSnapshot
 from stockoutops.alerting.delivery import AlertDeliveryRepository
 from stockoutops.alerting.delivery_settings import AlertDeliverySettings
+from stockoutops.alerting.enqueue import WebhookOutboxEnqueuer, build_delivery_enqueuer
+from stockoutops.alerting.outbox import AlertOutboxRepository
 from stockoutops.alerting.repository import AlertRepository
 from stockoutops.alerting.service import AlertService
-from stockoutops.alerting.sink import DisabledAlertSink, build_alert_sink
+from stockoutops.alerting.sink import DisabledAlertSink
+from stockoutops.alerting.worker import WorkerRunResult, build_worker
 from stockoutops.database import Database, run_migrations
 from stockoutops.errors import ConflictError, NotFoundError
 from stockoutops.identity import Principal
@@ -78,12 +81,51 @@ def alert_repository(clean_database) -> AlertRepository:
     return AlertRepository(Database(APP_DSN))
 
 
-def _service(alert_repository: AlertRepository, sink) -> AlertService:
+BASE_AT = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+
+
+def _service(alert_repository: AlertRepository) -> AlertService:
+    return AlertService(alert_repository, clock=lambda: BASE_AT)
+
+
+def _enabled_service(url: str, *, max_attempts: int = 5, **overrides: object) -> AlertService:
+    """Evaluation-side service whose intents land in the durable outbox."""
+
+    enqueuer = WebhookOutboxEnqueuer(_enabled_settings(url, **overrides), max_attempts=max_attempts)
     return AlertService(
-        alert_repository,
-        clock=lambda: datetime(2026, 8, 14, 12, 0, tzinfo=UTC),
-        sink=sink,
+        AlertRepository(Database(APP_DSN), delivery_enqueuer=enqueuer),
+        clock=lambda: BASE_AT,
     )
+
+
+def _drain(
+    url: str,
+    worker_id: str,
+    *,
+    now: datetime | None = None,
+    batch_size: int = 10,
+    **overrides: object,
+) -> WorkerRunResult:
+    """Run the outbox worker once. HTTP happens here, never during evaluation."""
+
+    moment = now or BASE_AT
+    worker = build_worker(
+        AlertOutboxRepository(Database(APP_DSN)),
+        _enabled_settings(url, **overrides),
+        worker_id=worker_id,
+        clock=lambda: moment,
+    )
+    return worker.run_once(batch_size=batch_size)
+
+
+def _count_outbox_rows() -> int:
+    with psycopg.connect(ADMIN_DSN) as connection:
+        return connection.execute("SELECT count(*) FROM alert_outbox").fetchone()[0]
+
+
+def _outbox_rows() -> list[dict[str, object]]:
+    with psycopg.connect(ADMIN_DSN, row_factory=psycopg.rows.dict_row) as connection:
+        return list(connection.execute("SELECT * FROM alert_outbox ORDER BY outbox_id"))
 
 
 def _enabled_settings(url: str, **overrides: object) -> AlertDeliverySettings:
@@ -122,13 +164,15 @@ def test_delivery_disabled_makes_zero_outbound_requests(
 ) -> None:
     with RecordingWebhookServer() as receiver:
         settings = AlertDeliverySettings(enabled=False, webhook_url=receiver.url)
-        service = _service(alert_repository, build_alert_sink(Database(APP_DSN), settings))
+        assert build_delivery_enqueuer(settings) is None
+        service = _service(alert_repository)
         results = service.evaluate(
             _principal(), _firing_snapshot(), idempotency_prefix="disabled-delivery"
         )
         assert isinstance(service.sink, DisabledAlertSink)
         assert receiver.requests == []
         assert _count_delivery_attempts() == 0
+        assert _count_outbox_rows() == 0
         assert _count_alert_events() == 5
         assert all(item.external_alert_delivery_count == 0 for item in results)
         assert all(item.live_slo_evidence_eligible is False for item in results)
@@ -139,16 +183,18 @@ def test_enabled_firing_alert_makes_one_bounded_delivery(
     alert_repository: AlertRepository,
 ) -> None:
     with RecordingWebhookServer() as receiver:
-        service = _service(
-            alert_repository,
-            build_alert_sink(Database(APP_DSN), _enabled_settings(receiver.url)),
-        )
+        service = _enabled_service(receiver.url)
         results = service.evaluate(
             _principal(), _firing_snapshot(), idempotency_prefix="enabled-firing"
         )
         firing = next(item for item in results if item.transition == "FIRED")
         assert firing.policy_id == "shadow-escalation-disagreement-rate"
         assert firing.evidence_label == "SIMULATED"
+
+        # Evaluation itself performs no network I/O; the worker delivers.
+        assert receiver.requests == []
+        assert _drain(receiver.url, "w-enabled-firing").delivered == 1
+
         assert len(receiver.requests) == 1
         body = receiver.requests[0]["body"]
         assert body["transition"] == "FIRED"
@@ -166,10 +212,7 @@ def test_enabled_firing_alert_makes_one_bounded_delivery(
 @pytest.mark.integration
 def test_replay_does_not_duplicate_delivery(alert_repository: AlertRepository) -> None:
     with RecordingWebhookServer() as receiver:
-        service = _service(
-            alert_repository,
-            build_alert_sink(Database(APP_DSN), _enabled_settings(receiver.url)),
-        )
+        service = _enabled_service(receiver.url)
         first = service.evaluate(
             _principal(), _firing_snapshot(), idempotency_prefix="replay-delivery"
         )
@@ -178,6 +221,8 @@ def test_replay_does_not_duplicate_delivery(alert_repository: AlertRepository) -
         )
         assert all(item.idempotent_replay for item in replay)
         assert [item.evaluation_id for item in replay] == [item.evaluation_id for item in first]
+        assert _count_outbox_rows() == 1
+        _drain(receiver.url, "w-replay")
         assert len(receiver.requests) == 1
     assert _count_delivery_attempts() == 1
     assert _count_alert_events() == 5
@@ -188,10 +233,7 @@ def test_concurrent_delivery_converges_without_alert_storm(
     alert_repository: AlertRepository,
 ) -> None:
     with RecordingWebhookServer() as receiver:
-        service = _service(
-            alert_repository,
-            build_alert_sink(Database(APP_DSN), _enabled_settings(receiver.url)),
-        )
+        service = _enabled_service(receiver.url)
 
         def evaluate_once():
             return service.evaluate(
@@ -202,6 +244,8 @@ def test_concurrent_delivery_converges_without_alert_storm(
 
         with ThreadPoolExecutor(max_workers=6) as pool:
             results = [future.result() for future in [pool.submit(evaluate_once) for _ in range(6)]]
+        assert _count_outbox_rows() == 1
+        _drain(receiver.url, "w-concurrent")
         assert len(receiver.requests) == 1
         assert _count_delivery_attempts() == 1
         assert _count_alert_events() == 5
@@ -213,10 +257,7 @@ def test_firing_then_resolved_sends_second_lifecycle_notification(
     alert_repository: AlertRepository,
 ) -> None:
     with RecordingWebhookServer() as receiver:
-        service = _service(
-            alert_repository,
-            build_alert_sink(Database(APP_DSN), _enabled_settings(receiver.url)),
-        )
+        service = _enabled_service(receiver.url)
         firing = service.evaluate(
             _principal(), _firing_snapshot(), idempotency_prefix="lifecycle-firing"
         )
@@ -229,6 +270,7 @@ def test_firing_then_resolved_sends_second_lifecycle_notification(
             ),
             idempotency_prefix="lifecycle-resolved",
         )
+        _drain(receiver.url, "w-lifecycle")
         transitions = [item["body"]["transition"] for item in receiver.requests]
         assert transitions == ["FIRED", "RESOLVED"]
         assert next(item.transition for item in firing if item.transition == "FIRED") == "FIRED"
@@ -242,19 +284,26 @@ def test_firing_then_resolved_sends_second_lifecycle_notification(
 
 @pytest.mark.integration
 def test_timeout_preserves_original_alert_evidence(alert_repository: AlertRepository) -> None:
+    """A timeout is ambiguous: retry, never a silent drop, never lost evidence."""
+
     with RecordingWebhookServer(hang_seconds=0.6) as receiver:
-        service = _service(
-            alert_repository,
-            build_alert_sink(
-                Database(APP_DSN),
-                _enabled_settings(receiver.url, timeout_seconds=0.2, max_attempts=2),
-            ),
-        )
+        service = _enabled_service(receiver.url, max_attempts=2)
         results = service.evaluate(
             _principal(), _firing_snapshot(), idempotency_prefix="timeout-delivery"
         )
         assert _count_alert_events() == 5
         assert any(item.transition == "FIRED" for item in results)
+
+        first = _drain(receiver.url, "w-timeout", timeout_seconds=0.2, now=BASE_AT)
+        assert first.retried == 1
+        second = _drain(
+            receiver.url,
+            "w-timeout",
+            timeout_seconds=0.2,
+            now=BASE_AT + timedelta(seconds=600),
+        )
+        assert second.dead_lettered == 1
+
     rows = _delivery_rows()
     assert len(rows) == 1
     assert rows[0]["status"] == "FAILED"
@@ -263,6 +312,12 @@ def test_timeout_preserves_original_alert_evidence(alert_repository: AlertReposi
     firing = next(item for item in results if item.transition == "FIRED")
     assert firing.external_alert_delivery_count == 0
     assert firing.live_slo_evidence_eligible is False
+
+    outbox = AlertOutboxRepository(Database(APP_DSN))
+    dead = outbox.dead_letters(_principal())
+    assert len(dead) == 1
+    events = outbox.attempt_events(_principal(), dead[0]["outbox_id"])
+    assert {event["outcome"] for event in events} == {"AMBIGUOUS"}
 
 
 @pytest.mark.integration
@@ -273,18 +328,17 @@ def test_unreachable_receiver_preserves_alert_evidence(
     sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]
     sock.close()
-    service = _service(
-        alert_repository,
-        build_alert_sink(
-            Database(APP_DSN),
-            _enabled_settings(f"http://127.0.0.1:{port}/alerts", timeout_seconds=0.2),
-        ),
-    )
+    url = f"http://127.0.0.1:{port}/alerts"
+    service = _enabled_service(url, max_attempts=2)
     results = service.evaluate(
         _principal(), _firing_snapshot(), idempotency_prefix="unreachable-delivery"
     )
     assert _count_alert_events() == 5
     assert any(item.state == "FIRING" for item in results)
+
+    _drain(url, "w-unreachable", timeout_seconds=0.2, now=BASE_AT)
+    _drain(url, "w-unreachable", timeout_seconds=0.2, now=BASE_AT + timedelta(seconds=600))
+
     rows = _delivery_rows()
     assert len(rows) == 1
     assert rows[0]["status"] == "FAILED"
@@ -296,18 +350,13 @@ def test_secrets_are_absent_from_delivery_rows_and_payloads(
     alert_repository: AlertRepository,
 ) -> None:
     with RecordingWebhookServer() as receiver:
-        service = _service(
-            alert_repository,
-            build_alert_sink(
-                Database(APP_DSN),
-                _enabled_settings(receiver.url, token=SECRET_TOKEN),
-            ),
-        )
+        service = _enabled_service(receiver.url, token=SECRET_TOKEN)
         service.evaluate(_principal(), _firing_snapshot(), idempotency_prefix="secret-delivery")
+        _drain(receiver.url, "w-secret", token=SECRET_TOKEN)
         request = receiver.requests[0]
         assert request["authorization"] == f"Bearer {SECRET_TOKEN}"
         assert SECRET_TOKEN not in json.dumps(request["body"])
-    for row in _delivery_rows():
+    for row in _delivery_rows() + _outbox_rows():
         dumped = json.dumps(row, default=str)
         assert SECRET_TOKEN not in dumped
         assert "Authorization" not in dumped
@@ -319,10 +368,7 @@ def test_sev1_fail_closed_still_persists_and_may_notify(
     alert_repository: AlertRepository,
 ) -> None:
     with RecordingWebhookServer() as receiver:
-        service = _service(
-            alert_repository,
-            build_alert_sink(Database(APP_DSN), _enabled_settings(receiver.url)),
-        )
+        service = _enabled_service(receiver.url)
         with pytest.raises(ConflictError) as violation:
             service.evaluate(
                 _principal(),
@@ -330,6 +376,10 @@ def test_sev1_fail_closed_still_persists_and_may_notify(
                 idempotency_prefix="sev1-delivery",
             )
         assert violation.value.code == "SHADOW_EXTERNAL_ACTION_DETECTED"
+        # Fail-closed aborts the caller, but the durable intent already
+        # committed with the evidence, so the worker still delivers it.
+        assert _count_outbox_rows() == 1
+        _drain(receiver.url, "w-sev1")
         assert len(receiver.requests) == 1
         assert receiver.requests[0]["body"]["policy_id"] == "shadow-external-action-safety"
         assert receiver.requests[0]["body"]["transition"] == "FIRED"
@@ -340,14 +390,12 @@ def test_sev1_fail_closed_still_persists_and_may_notify(
 @pytest.mark.integration
 def test_delivery_attempts_are_tenant_scoped(alert_repository: AlertRepository) -> None:
     with RecordingWebhookServer() as receiver:
-        service = _service(
-            alert_repository,
-            build_alert_sink(Database(APP_DSN), _enabled_settings(receiver.url)),
-        )
+        service = _enabled_service(receiver.url)
         results = service.evaluate(
             _principal(), _firing_snapshot(), idempotency_prefix="tenant-delivery"
         )
         firing = next(item for item in results if item.transition == "FIRED")
+        _drain(receiver.url, "w-tenant")
         delivery = AlertDeliveryRepository(Database(APP_DSN))
         owned = delivery.attempts(_principal(), firing.evaluation_id)
         assert len(owned) == 1
@@ -360,6 +408,10 @@ def test_delivery_attempts_are_tenant_scoped(alert_repository: AlertRepository) 
                 payload_hash="d" * 64,
                 claimed_at=datetime(2026, 8, 14, 12, 0, tzinfo=UTC),
             )
+
+        outbox = AlertOutboxRepository(Database(APP_DSN))
+        assert outbox.for_evaluation(_principal(), firing.evaluation_id) is not None
+        assert outbox.for_evaluation(_principal("t_beta"), firing.evaluation_id) is None
 
 
 def _claimed_firing(
@@ -382,13 +434,13 @@ def _claimed_firing(
 
 
 def _firing_without_delivery(alert_repository: AlertRepository, prefix: str) -> AlertEvaluation:
-    service = _service(alert_repository, DisabledAlertSink())
+    service = _service(alert_repository)
     results = service.evaluate(_principal(), _firing_snapshot(), idempotency_prefix=prefix)
     return next(item for item in results if item.transition == "FIRED")
 
 
 def _initial_ok_without_delivery(alert_repository: AlertRepository, prefix: str) -> AlertEvaluation:
-    service = _service(alert_repository, DisabledAlertSink())
+    service = _service(alert_repository)
     results = service.evaluate(_principal(), _snapshot(), idempotency_prefix=prefix)
     return next(item for item in results if item.transition == "INITIAL_OK")
 
@@ -581,6 +633,72 @@ def test_app_role_cannot_insert_delivery_attempt_with_forged_identity(
             transition=transition,
         )
     assert _count_delivery_attempts() == 0
+
+
+@pytest.mark.integration
+def test_app_role_temp_evaluation_event_cannot_authorize_forged_delivery_claim(
+    alert_repository: AlertRepository,
+) -> None:
+    """TEMP alert_evaluation_event must not satisfy the PR #25 insert identity guard."""
+    firing = _firing_without_delivery(alert_repository, "temp-shadow-pr25-eval")
+    forged_fingerprint = "b" * 64
+    with (
+        psycopg.connect(APP_DSN) as connection,
+        pytest.raises(psycopg.Error),
+        connection.transaction(),
+    ):
+        connection.execute(
+            """
+            CREATE TEMP TABLE alert_evaluation_event (
+                alert_evaluation_id bigint,
+                tenant_id text,
+                alert_fingerprint text,
+                transition text
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO alert_evaluation_event (
+                alert_evaluation_id, tenant_id, alert_fingerprint, transition
+            ) VALUES (%s, 't_beta', %s, 'RESOLVED')
+            """,
+            (firing.evaluation_id, forged_fingerprint),
+        )
+        connection.execute(
+            """
+            INSERT INTO public.alert_delivery_attempt (
+                tenant_id, evaluation_id, alert_fingerprint, transition,
+                destination_host, status, attempt_count, http_status,
+                error_class, payload_hash, claimed_at, completed_at
+            ) VALUES (
+                't_beta', %s, %s, 'RESOLVED', '127.0.0.1', 'CLAIMED', 0,
+                NULL, NULL, %s, %s, NULL
+            )
+            """,
+            (
+                firing.evaluation_id,
+                forged_fingerprint,
+                "f" * 64,
+                datetime(2026, 8, 14, 12, 0, tzinfo=UTC),
+            ),
+        )
+    assert _count_delivery_attempts() == 0
+
+    _insert_delivery_attempt_as_app(
+        firing,
+        status="CLAIMED",
+        attempt_count=0,
+        http_status=None,
+        error_class=None,
+        completed_at=None,
+    )
+    row = _delivery_rows()[0]
+    assert row["status"] == "CLAIMED"
+    assert row["tenant_id"] == firing.tenant_id
+    assert row["alert_fingerprint"] == firing.alert_fingerprint
+    assert row["transition"] == firing.transition
+    assert row["evaluation_id"] == firing.evaluation_id
 
 
 @pytest.mark.integration
@@ -855,11 +973,11 @@ def test_terminal_delivery_metadata_cannot_be_rewritten(
 @pytest.mark.integration
 def test_delivery_delete_is_rejected(alert_repository: AlertRepository) -> None:
     with RecordingWebhookServer() as receiver:
-        service = _service(
-            alert_repository,
-            build_alert_sink(Database(APP_DSN), _enabled_settings(receiver.url)),
-        )
+        service = _enabled_service(receiver.url)
         service.evaluate(_principal(), _firing_snapshot(), idempotency_prefix="delete-delivery")
+        # Drain so a terminal ledger row exists for the DELETE to be rejected on.
+        assert _drain(receiver.url, "w-delete").delivered == 1
+    assert _count_delivery_attempts() == 1
     for dsn in (ADMIN_DSN, APP_DSN):
         with psycopg.connect(dsn) as connection, pytest.raises(psycopg.Error):
             connection.execute("DELETE FROM alert_delivery_attempt")
